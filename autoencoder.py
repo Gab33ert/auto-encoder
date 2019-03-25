@@ -10,9 +10,11 @@ from matplotlib.collections import PatchCollection
 from matplotlib.animation import FuncAnimation
 
 
-def connect(Pl,l):
+def connect(Pl, l, n_input_cells, n_output_cells):
     sigma=300
     W=[]
+    win=np.floor(np.random.uniform(0,2,(len(Pl[0]),n_input_cells)))
+    W.append(win)
     for j in range(l-1):
         P1=Pl[j]
         P2=Pl[j+1]
@@ -34,6 +36,8 @@ def connect(Pl,l):
                     if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):
                         w[j,i]=1
         W.append(w)
+    wout=np.floor(np.random.uniform(0,2,(n_output_cells,len(Pl[l-1]))))
+    W.append(wout)
     
     return W
 
@@ -91,7 +95,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 	    density[:,i]=((3)*ii*(ii-1)+1)*np.ones((1,n)) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "aha.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
+    filename = "autoencoder-second-degree.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -107,7 +111,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
     #X,Y = cells_pos[:,0], cells_pos[:,1]
 
     
-    W=connect(cells_pos, l)
+    W=connect(cells_pos, l, n_input_cells, n_output_cells)
     return cells_pos/1000, W#, W_in, W_out, bias
     
 
@@ -115,12 +119,12 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 # ------
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
-P, W = build(20, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0,l=3)
+P, W = build(20, 6, 6, n_input=1, n_output=1,sparsity=0.05, seed=0,l=3)
 
-print(P, W)
+print(W)
 
-x=np.array([1,2,3])
-#print(forward(x,W))
+x=np.array([1,2,3,4,5,6])
+print(forward(x,W))
 
 
 '''
