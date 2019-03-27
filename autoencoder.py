@@ -10,6 +10,7 @@ from matplotlib.collections import PatchCollection
 from matplotlib.animation import FuncAnimation
 from random import randint
 import copy
+from sklearn import preprocessing
 
 def connect(Pl, l, n_input_cells, n_output_cells):
     sigma=300
@@ -50,39 +51,6 @@ def connect(Pl, l, n_input_cells, n_output_cells):
     
     return W
 
-def sigmoid(x):
-    return 1/(1+np.exp(-x))
-
-def dsigmoid(x):
-    return sigmoid(x)*(1-sigmoid(x))
-
-def forward(x, w):
-    l=len(w)
-    X=[]
-    for i in range(l):
-        X.append(x)
-        x=sigmoid(w[i].dot(np.transpose(x)))
-    return X, x
-
-def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actual error
-    X, x_out=forward(x_in,w)
-    l=len(w)-1
-    e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
-    for i in range(l-1,-1,-1):
-        e.append(dsigmoid(w[i].dot(X[i]))*e[l-1-i].dot(w[i+1]))
-    for i in range(l+1):
-        w[i]-=W[i]*alpha*np.outer(e[l-i], X[i])
-    return w, (np.sum(x_out-x_in))**2
-
-    
-def train(x_in, w, iterr, alpha):
-    error=np.zeros(iterr)
-    for i in range(iterr):
-        w, error[i] = backprop(x_in, w, alpha)
-    plt.loglog(error)
-    return w, error[iterr-1]
-
-
 def split(P, l):#l number of layer 
     n=len(P)
     layer=[]
@@ -100,6 +68,7 @@ def split(P, l):#l number of layer
         temp=np.array(temp)
         layer.append(temp)
     return np.array(layer)
+
 
 def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
           n_input = 3, n_output = 3, sparsity = 0.01, seed=0,l=10):
@@ -124,7 +93,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
     n=1000
     for i in range(n):
 	    ii=i/(n-1)
-	    density[:,i]=((3.5)*ii*(ii-1)+1)*np.ones((1,n)) #neurone density
+	    density[:,i]=np.power(((3.6)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
     filename = "autoencoder-second-degree.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
@@ -147,21 +116,83 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
     return cells_pos/1000, W#, W_in, W_out, bias
     
 
+
+
+
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
+
+def dsigmoid(x):
+    return sigmoid(x)*(1-sigmoid(x))
+
+def forward(x, w):
+    l=len(w)
+    X=[]
+    for i in range(l):
+        X.append(x)
+        x=sigmoid(w[i].dot(x))
+    return X, x
+
+def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actual error
+    X, x_out=forward(x_in,w)
+    l=len(w)-1
+    e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
+    for i in range(l-1,-1,-1):
+        e.append(dsigmoid(w[i].dot(X[i]))*e[l-1-i].dot(w[i+1]))
+    for i in range(l+1):
+        w[i]-=W[i]*alpha*np.outer(e[l-i], X[i])
+    return w, (np.sum(x_out-x_in))**2
+
+    
+def train(x_in, w, iterr, alpha):
+    error=np.zeros(iterr)
+    for i in range(iterr):
+        w, error[i] = backprop(x_in, w, alpha)
+    plt.loglog(error)
+    return w, error[iterr-1]
+
+
+
+
+def generate_poly(data_size, n, degree):
+    data=np.zeros((data_size, n))
+    def poly(x, param):
+        p=0
+        for i in range(len(param)):
+            p=p*x+param[i]
+        return p
+    for i in range(n):
+        a=2*np.random.random([degree+1])-1
+        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
+    return data
+
+
+
 # Build
 # ------
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
 l=5    
 size=10
-P, W = build(40, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=0)
-x=np.random.random([size])
 
-w=copy.deepcopy(W)
-a,b=train(x, w, 10000, 3)
-for i in range(len(a)):
-    print(a[i].shape)
+P, W = build(30, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=1)
+#x=np.random.random([size])
+
+data=generate_poly(10, 5, 3)
+forward(data,W)
+
+
 
 """
+w=copy.deepcopy(W)
+
+a,b=train(x, w, 10000, 3)
+print(b)
+for i in range(len(a)):
+    print(a[i].shape)
+"""
+"""
+
 #print('{0:1.2e}'.format(b))
 li=[0.5]
 for i in range(3):
