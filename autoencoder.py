@@ -8,12 +8,21 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import PathPatch, Polygon
 from matplotlib.collections import PatchCollection
 from matplotlib.animation import FuncAnimation
-
+from random import randint
+import copy
 
 def connect(Pl, l, n_input_cells, n_output_cells):
     sigma=300
     W=[]
-    win=np.floor(np.random.uniform(0,2,(len(Pl[0]),n_input_cells)))
+    q=1.2 #control the rate connection to first layer (has to be bigger than 1)
+    win=np.floor(np.random.uniform(0,q,(len(Pl[0]),n_input_cells)))#create input connection
+    for i in range(n_input_cells):#ensure each entry is connected to at least one neurone
+        counter=0
+        for j in range(len(Pl[0])):
+            if win[j,i]!=0:
+                counter+=1
+        if counter==0:
+            win[randint(0,len(Pl[0])-1),i]=1
     W.append(win)
     for j in range(l-1):
         P1=Pl[j]
@@ -41,14 +50,37 @@ def connect(Pl, l, n_input_cells, n_output_cells):
     
     return W
 
-def one_step_forward(W,x):
-    return 1/(1+np.exp(-W.dot(np.transpose(x))))
+def sigmoid(x):
+    return 1/(1+np.exp(-x))
 
-def forward(x,W):
-    l=len(W)
+def dsigmoid(x):
+    return sigmoid(x)*(1-sigmoid(x))
+
+def forward(x, w):
+    l=len(w)
+    X=[]
     for i in range(l):
-        x=one_step_forward(W[i],x) 
-    return x
+        X.append(x)
+        x=sigmoid(w[i].dot(np.transpose(x)))
+    return X, x
+
+def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actual error
+    X, x_out=forward(x_in,w)
+    l=len(w)-1
+    e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
+    for i in range(l-1,-1,-1):
+        e.append(dsigmoid(w[i].dot(X[i]))*e[l-1-i].dot(w[i+1]))
+    for i in range(l+1):
+        w[i]-=W[i]*alpha*np.outer(e[l-i], X[i])
+    return w, (np.sum(x_out-x_in))**2
+
+    
+def train(x_in, w, iterr, alpha):
+    error=np.zeros(iterr)
+    for i in range(iterr):
+        w, error[i] = backprop(x_in, w, alpha)
+    plt.loglog(error)
+    return w, error[iterr-1]
 
 
 def split(P, l):#l number of layer 
@@ -92,7 +124,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
     n=1000
     for i in range(n):
 	    ii=i/(n-1)
-	    density[:,i]=((3)*ii*(ii-1)+1)*np.ones((1,n)) #neurone density
+	    density[:,i]=((3.5)*ii*(ii-1)+1)*np.ones((1,n)) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
     filename = "autoencoder-second-degree.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
@@ -119,179 +151,27 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 # ------
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
-P, W = build(20, 6, 6, n_input=1, n_output=1,sparsity=0.05, seed=0,l=3)
+l=5    
+size=10
+P, W = build(40, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=0)
+x=np.random.random([size])
 
-print(W)
+w=copy.deepcopy(W)
+a,b=train(x, w, 10000, 3)
+for i in range(len(a)):
+    print(a[i].shape)
 
-x=np.array([1,2,3,4,5,6])
-print(forward(x,W))
-
-
-'''
-def connect(P, k=10):
-    n = len(P)
-    dP = P.reshape(1,n,2) - P.reshape(n,1,2)
-        
-    # Distances
-    D = np.hypot(dP[...,0], dP[...,1])
-
-    # k nearest neighbors
-    # I = np.argsort(D, axis=1)
-    # W = np.zeros((n,n))
-    #for i in range(n):
-    #    # Connections (no self-connection -> 1:k+1)
-    #    W[i,I[i,1:k+1]] = 1
-
-
-    # Isotropic connections
-    # W = np.zeros((n,n))
-    # for i in range(n):
-    #     R = D[i]/1000.0
-    #     W[i] = np.random.uniform(0,1,len(R)) < np.exp(-R/0.125)
-    #     W[i,i] = 0
-
-    # Non-isotropic connections
-    I = np.argsort(D, axis=1)
-    A = np.zeros((n,n))
-    for i in range(n):
-        A[i] = np.arctan2(dP[i,:,1], dP[i,:,0]) * 180.0 / np.pi
-
-    n = len(P)
-    W = np.zeros((n,n))
-    for i in range(n):
-        p = 0
-        for j in range(1,n):
-            if  A[i,I[i,j]] > 90 or A[i,I[i,j]] < -90: 
-            # if -135 < A[i,I[i,j]] < -45:
-                if np.random.uniform(0,1) < 0.25:
-                    W[I[i,j],i] = 1
-                p += 1
-            if p > k:
-                break
-
-    return W
-
-
-def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
-          n_input = 3, n_output = 3, sparsity = 0.01, seed=0):
-    """
-
-    Parameters:
-    -----------
-
-    n_cells:        Number of cells in the reservoir
-    n_input_cells:  Number of cells receiving external input
-    n_output_cells: Number of cells sending external output
-    n_input:        Number of external input
-    n_output:       Number of external output
-    sparsity:       Connection rate
-    seed:           Seed for the random genrator
-
-    
-    """
-    
-    np.random.seed(seed)
-    density    = np.ones((1000,1000))
-    density_P  = density.cumsum(axis=1)
-    density_Q  = density_P.cumsum(axis=1)
-    filename = "CVT-%d-seed-%d.npy" % (n_cells,seed)
-
-    if not os.path.exists(filename):
-        cells_pos = np.zeros((n_cells,2))
-        cells_pos[:,0] = np.random.uniform(0, 1000, n_cells)
-        cells_pos[:,1] = np.random.uniform(0, 1000, n_cells)
-        for i in tqdm.trange(75):
-            _, cells_pos = voronoi.centroids(cells_pos, density, density_P, density_Q)
-        np.save(filename, cells_pos)
-
-    cells_pos = np.load(filename)
-    X,Y = cells_pos[:,0], cells_pos[:,1]
-    cells_in  = np.argpartition(X, +n_input_cells)[:+n_input_cells]
-    cells_out = np.argpartition(X, -n_output_cells)[-n_output_cells:]
-
-    k = int(n_cells * sparsity)
-    W = connect(cells_pos, k=k)
-
-    W_in  = np.zeros((n_input, n_cells))
-    W_in[:,cells_in] = 1
-
-    W_out = np.zeros((n_cells, n_output))
-    W_out[cells_out,:] = 1
-
-    # Bias unit index (arbitrarily set to the one nearest from (0,0))
-    bias = np.argmin(np.hypot(X,Y))
-
-    W[:,bias] = 1
-    W_out[bias,:] = 1
-    
-    return cells_pos/1000, W, W_in, W_out, bias
-    
-
-# Build
-# ------
-P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,
-                                              sparsity=0.05, seed=0)
-leak = 0.01
-radius = 1.0
-# ------
-
-
-# Build weights (taking bias into account)
-W_in  *= np.random.uniform(-1.0, 1.0, W_in.shape)
-W     *= np.random.uniform(-1.0, 1.0, W.shape)
-W     *= radius / np.abs(np.linalg.eig(W)[0]).max()
-W_out *= np.random.uniform(-1.0, 1.0, W_out.shape)
-
-
-sample_input  = .5
-V = np.tanh(np.dot(sample_input, W_in))
-V[0,bias] = 1.0 
-#for i in range(25):
-#    sample_input = .5
-#    V = (1-leak)*V + leak*np.tanh(np.dot(sample_input, W_in) + np.dot(V,W))
-#    V[0,bias] = 1.0 
- #    output = np.dot(V,W_out)
-
-
-facecolors = np.ones((V.size,4))
-cmap = plt.get_cmap('viridis') 
-norm = matplotlib.colors.Normalize(vmin=-1, vmax=+1)
-cmap = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
-cmap._A = []
-facecolors[:] = cmap.to_rgba(V)
-
-
-# Display
-fig = plt.figure(figsize=(6,6))
-
-ax = plt.subplot(1, 1, 1, aspect=1)
-patches = []
-regions, vertices = voronoi.voronoi_finite_polygons_2d(P)
-for i,region in enumerate(regions):
-    patches.append(Polygon(vertices[region]))
-collection = PatchCollection(patches,
-                             facecolor=facecolors, edgecolor="black", linewidth=0.25)
-ax.add_collection(collection)
-ax.scatter(P[bias,0], P[bias,1], s=10,
-           facecolor="black", edgecolor="black", linewidth=.5)
-
-X, Y = P[:,0], P[:,1]
-ax.set_xlim(0,1), ax.set_xticks([])
-ax.set_ylim(0,1), ax.set_yticks([])
-
-def update(frame_number):
-    global V
-
-    sample_input =  2*np.cos(frame_number/50)
-
-    for i in range(25):
-        V = (1-leak)*V + leak*np.tanh(np.dot(sample_input, W_in) + np.dot(V,W))
-        V[0,bias] = 1.0
-    facecolors[:] = cmap.to_rgba(V)
-    collection.set_facecolors(facecolors)
-
-animation = FuncAnimation(fig, update, interval=10)
-
-#plt.tight_layout()
+"""
+#print('{0:1.2e}'.format(b))
+li=[0.5]
+for i in range(3):
+    li.append(li[i]*1.8)
+c=[]
+for i in li:
+    w=copy.deepcopy(W)
+    a,b=train(x, w, 10000, i)
+    print(b, i)
+    c.append(b)
 plt.show()
-'''
+plt.loglog(li, c)
+"""
