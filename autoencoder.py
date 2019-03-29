@@ -13,19 +13,31 @@ import copy
 from sklearn import preprocessing
 
 def connect(Pl, l, n_input_cells, n_output_cells):
-    sigma=300
+    sigma=200
+    sigma_in=200
     W=[]
-    q=1.2 #control the rate connection to first layer (has to be bigger than 1)
-    win=np.floor(np.random.uniform(0,q,(len(Pl[0]),n_input_cells)))#create input connection
-    for i in range(n_input_cells):#ensure each entry is connected to at least one neurone
-        counter=0
-        for j in range(len(Pl[0])):
-            if win[j,i]!=0:
-                counter+=1
-        if counter==0:
-            win[randint(0,len(Pl[0])-1),i]=1
+    
+    #input connection
+    yin=np.zeros((n_input_cells,2))
+    yin[:,1]=np.linspace(0, 1000, n_input_cells)
+    P1=yin
+    P2=Pl[0]
+    n1 = len(P1)
+    n2 = len(P2)
+    
+    dP = P1.reshape(1,n1,2) - P2.reshape(n2,1,2)
+    
+    # Distances
+    #D = np.hypot(dP[...,0], dP[...,1])
+    D = dP[...,1]
+    win = np.zeros((n2,n1))
+    for i in range(n1):
+        for j in range(n2):
+            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma_in**2))):
+                win[j,i]=1
     W.append(win)
-    for j in range(l-1):
+    
+    for j in range(l-1):#hidden connection
         P1=Pl[j]
         P2=Pl[j+1]
         n1 = len(P1)
@@ -46,6 +58,7 @@ def connect(Pl, l, n_input_cells, n_output_cells):
                     if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):
                         w[j,i]=1
         W.append(w)
+    #output connection
     wout=np.floor(np.random.uniform(0,2,(n_output_cells,len(Pl[l-1]))))
     W.append(wout)
     
@@ -138,17 +151,21 @@ def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actu
     l=len(w)-1
     e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
     for i in range(l-1,-1,-1):
-        e.append(dsigmoid(w[i].dot(X[i]))*e[l-1-i].dot(w[i+1]))
+        e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
     for i in range(l+1):
-        w[i]-=W[i]*alpha*np.outer(e[l-i], X[i])
-    return w, (np.sum(x_out-x_in))**2
+        for j in range(x_in.shape[1]):
+           w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
+    return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
 
+def err(x_in,w):
+    X, x_out=forward(x_in,w)
+    return np.sum(np.abs((x_out-x_in)))/(x_in.shape[1]*x_in.shape[0])
     
-def train(x_in, w, iterr, alpha):
+def train(x_in, w, iterr, alpha,):
     error=np.zeros(iterr)
     for i in range(iterr):
-        w, error[i] = backprop(x_in, w, alpha)
-    plt.loglog(error)
+            w, error[i] = backprop(x_in, w, alpha)
+    plt.semilogy(error)
     return w, error[iterr-1]
 
 
@@ -176,13 +193,33 @@ l=5
 size=10
 
 P, W = build(30, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=1)
-#x=np.random.random([size])
+w=copy.deepcopy(W)
 
-data=generate_poly(10, 5, 3)
-forward(data,W)
+w[0]=(2*np.random.random(w[0].shape)-1)
+for i in range(1,len(w)):
+    w[i]=(2*np.random.random(w[i].shape)-1)*w[i]
 
 
+scaler = preprocessing.MinMaxScaler()
+data=generate_poly(size, 40, 2)
+data_t=generate_poly(size, 12, 2)
+scaled_data=scaler.fit_transform(data)
+scaled_data_t=scaler.fit_transform(data_t)
+#unscaled_data=scaler.inverse_transform(scaled_data)
 
+data=np.random.random([size,10])
+a,b=train(scaled_data, w, 50000, 0.05)
+
+X, x=forward(scaled_data,w)
+print(x)
+print(b)
+print("test", err(scaled_data_t,w))
+
+#for i in range(6):
+#    print(w[i]-W[i])
+#print(w)
+
+#print(b)
 """
 w=copy.deepcopy(W)
 
