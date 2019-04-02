@@ -12,79 +12,24 @@ from random import randint
 import copy
 from sklearn import preprocessing
 
-def connect(Pl, l, n_input_cells, n_output_cells):
-    sigma=100
-    sigma_in=100
-    W=[]
+def connect(P, n_input_cells, n_output_cells):
+    sigma=1000
+    d=500
     
-    #input connection
-    yin=np.zeros((n_input_cells,2))
-    yin[:,1]=np.linspace(0, 1000, n_input_cells)
-    P1=yin
-    P2=Pl[0]
-    n1 = len(P1)
-    n2 = len(P2)
-    
-    dP = P1.reshape(1,n1,2) - P2.reshape(n2,1,2)
-    
-    # Distances
-    #D = np.hypot(dP[...,0], dP[...,1])
-    D = dP[...,1]
-    win = np.zeros((n2,n1))
-    for i in range(n1):
-        for j in range(n2):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma_in**2))):
-                win[j,i]=1
-    W.append(win)
-    
-    for j in range(l-1):#hidden connection
-        P1=Pl[j]
-        P2=Pl[j+1]
-        n1 = len(P1)
-        n2 = len(P2)
-    
-        dP = P1.reshape(1,n1,2) - P2.reshape(n2,1,2)
-    
-            
-    
-        # Distances
-    
-        #D = np.hypot(dP[...,0], dP[...,1])
-        D = dP[...,1]
-    
-        w = np.zeros((n2,n1))
-        for i in range(n1):
-                for j in range(n2):
-                    if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):
-                        w[j,i]=1
-        W.append(w)
-    #output connection
-    wout=np.floor(np.random.uniform(0,2,(n_output_cells,len(Pl[l-1]))))
-    W.append(wout)
-    
+
+    n = len(P)
+    dP = P.reshape(1,n,2) - P.reshape(n,1,2)
+    # Shifted Distances 
+    D = np.hypot(dP[...,0]+d, dP[...,1])
+    W = np.zeros((n,n))
+    for i in range(n):
+        for j in range(n):
+            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2)))& (P[i,0]<P[j,0]):
+                W[j,i]=1  
     return W
 
-def split(P, l):#l number of layer 
-    n=len(P)
-    layer=[]
-    for j in range(l):
-        temp=[]
-        c=1
-        for i in range(n):
-            if((1000/l)*j<P[i,0]<=(1000/l)*(j+1)):
-                if(c==0):
-                    temp.append(P[i,:])
-                else:
-                    #layer.append(P[i,:])
-                    temp.append(P[i,:])
-                    c=0
-        temp=np.array(temp)
-        layer.append(temp)
-    return np.array(layer)
 
-
-def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
-          n_input = 3, n_output = 3, sparsity = 0.01, seed=0,l=10):
+def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, seed=0):
     """
 
     Parameters:
@@ -109,7 +54,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 	    density[:,i]=np.power(((3.6)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "autoencoder-second-degree-big.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
+    filename = "test.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -120,20 +65,100 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
         np.save(filename, cells_pos)
 
     cells_pos = np.load(filename)
-    cells_pos=split(cells_pos,l)
-  
-    #X,Y = cells_pos[:,0], cells_pos[:,1]
-
+    cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
+    cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
     
-    W=connect(cells_pos, l, n_input_cells, n_output_cells)
-    return cells_pos/1000, W#, W_in, W_out, bias
+    W=connect(cells_pos, n_input_cells, n_output_cells)
+
+    W*=(2*np.random.random(W.shape)-1)
+    return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]#, W_in, W_out, bias
     
-
-
 
 
 def sigmoid(x):
-    return 1/(1+np.exp(-x))
+    return 2/(1+np.exp(-x))-1
+
+def dsigmoid(x):
+    f=sigmoid(x)
+    return -(f+1)*(f-1)/2
+
+def forward(x, w, t):
+    X=[]
+    for i in range(t):
+        X.append(x)
+        x=sigmoid(w.dot(x))
+    return X, x
+
+def backward(x_in, w, t, in_index, out_index, alpha):
+    X, x_out=forward(x_in, w, t)
+    x_in_reshape=np.zeros(x_in.shape)
+    x_in_reshape[out_index]=x_in[in_index]
+
+    mask = np.ones(len(x_out), dtype=bool)
+    mask[out_index] = False
+    x_out_reshape=x_out
+    x_out_reshape[mask]=0
+
+    e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
+    for i in range(t-2,-1,-1):
+        e.append(dsigmoid(w.dot(X[i]))*np.transpose(w).dot(e[t-2-i]))
+    for i in range(t):
+        for j in range(x_in.shape[1]):
+            w-=alpha*np.outer(e[t-1-i][:,j], X[i][:,j])
+            
+    return  w#, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape*x_in.shape[1])
+
+    
+def train(x_in, w, t, in_index, out_index, iterr, alpha):
+    error=np.zeros(iterr)
+    for i in range(iterr):
+            w= backward(x_in, w, t, in_index, out_index, alpha)
+    plt.semilogy(error)
+    return w, error[iterr-1]
+
+def generate_poly(data_size, n, degree):
+    data=np.zeros((data_size, n))
+    def poly(x, param):
+        p=0
+        for i in range(len(param)):
+            p=p*x+param[i]
+        return p
+    for i in range(n):
+        a=2*np.random.random([degree+1])-1
+        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
+    return data
+
+size=5#70
+n_cell=20#300
+
+P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
+
+scaler = preprocessing.MinMaxScaler()#be careful the polynome are in [0,1] maybe you need [-1,1]
+data=generate_poly(size, 2, 50)
+data_t=generate_poly(size, 40, 10)
+scaled_data=scaler.fit_transform(data)
+scaled_data_t=scaler.fit_transform(data_t)
+
+y=np.zeros((n_cell,2))
+y[in_index]=scaled_data
+x=np.zeros(n_cell)
+
+a=np.ones(size)
+a[2:5]=0
+a[12:15]=-1
+x[in_index]=a
+
+w,e=train(y, W, 3, in_index, out_index, iterr=5000, alpha=0.04)
+X, x_out=forward(x, W, 10)
+#print(x_out[out_index])
+#print(x[in_index])
+print(e)
+
+
+    
+#print(P[cc])
+"""
+
 
 def dsigmoid(x):
     return sigmoid(x)*(1-sigmoid(x))
@@ -154,14 +179,14 @@ def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actu
         e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
     for i in range(l+1):
         for j in range(x_in.shape[1]):
-            w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
+           w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
     return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
 
 def err(x_in,w):
     X, x_out=forward(x_in,w)
     return np.sum(np.abs((x_out-x_in)))/(x_in.shape[1]*x_in.shape[0])
     
-def train(x_in, w, iterr, alpha):
+def train(x_in, w, iterr, alpha,):
     error=np.zeros(iterr)
     for i in range(iterr):
             w, error[i] = backprop(x_in, w, alpha)
@@ -202,13 +227,14 @@ for i in range(1,len(w)):
 
 
 scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 40, 50)
-data_t=generate_poly(size, 40, 50)
+data=generate_poly(size, 40, 10)
+data_t=generate_poly(size, 10, 10)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
 #unscaled_data=scaler.inverse_transform(scaled_data)
+
 data=np.random.random([size,10])
-a,b=train(scaled_data, w, 2000, 0.02)
+a,b=train(scaled_data, w, 50000, 0.02)
 
 X, x=forward(scaled_data,w)
 print(b)
@@ -219,6 +245,7 @@ print("test", err(scaled_data_t,w))
 #print(w)
 
 #print(b)
+"""
 """
 w=copy.deepcopy(W)
 
