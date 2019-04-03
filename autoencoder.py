@@ -13,8 +13,8 @@ import copy
 from sklearn import preprocessing
 
 def connect(Pl, l, n_input_cells, n_output_cells):
-    sigma=100
-    sigma_in=100
+    sigma=400
+    sigma_in=400
     W=[]
     
     #input connection
@@ -154,7 +154,7 @@ def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actu
         e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
     for i in range(l+1):
         for j in range(x_in.shape[1]):
-            w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
+            w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])*W[i]
     return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
 
 def err(x_in,w):
@@ -164,6 +164,7 @@ def err(x_in,w):
 def train(x_in, w, iterr, alpha):
     error=np.zeros(iterr)
     for i in range(iterr):
+            alpha*=(10)**(1/(-iterr))
             w, error[i] = backprop(x_in, w, alpha)
     plt.semilogy(error)
     return w, error[iterr-1]
@@ -180,7 +181,7 @@ def generate_poly(data_size, n, degree):
         return p
     for i in range(n):
         a=2*np.random.random([degree+1])-1
-        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
+        data[:,i]=poly(np.linspace(-1, 1, data_size), a)
     return data
 
 
@@ -198,22 +199,27 @@ w=copy.deepcopy(W)
 w[0]=(2*np.random.random(w[0].shape)-1)*w[0]
 for i in range(1,len(w)):
     w[i]=(2*np.random.random(w[i].shape)-1)*w[i]
-    print(w[i].shape)
-
 
 scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 40, 50)
-data_t=generate_poly(size, 40, 50)
+data=generate_poly(size, 800, 40)
+data_t=generate_poly(size, 40, 40)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
-#unscaled_data=scaler.inverse_transform(scaled_data)
-data=np.random.random([size,10])
-a,b=train(scaled_data, w, 2000, 0.02)
 
-X, x=forward(scaled_data,w)
+
+a,b=train(scaled_data, w, 1000, 0.003)
+
+X, x=forward(scaled_data_t[:,0:10],w)
+
+plt.show()
+for i in range(10):
+    plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
+    plt.plot(np.linspace(-1, 1, size),x[:,i])
+    plt.show()
+    
+print(np.max(scaled_data_t[:,0:10]-x))
 print(b)
 print("test", err(scaled_data_t,w))
-
 #for i in range(6):
 #    print(w[i]-W[i])
 #print(w)
