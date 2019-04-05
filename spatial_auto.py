@@ -5,16 +5,13 @@ import voronoi
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.patches import PathPatch, Polygon
-from matplotlib.collections import PatchCollection
-from matplotlib.animation import FuncAnimation
-from random import randint
 import copy
 from sklearn import preprocessing
+np.set_printoptions(threshold=np.inf)
 
-def connect(P, n_input_cells, n_output_cells):
-    sigma=1000
-    d=500
+
+def connect(P, n_input_cells, n_output_cells, d, sigma):
+
     
 
     n = len(P)
@@ -46,7 +43,7 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
     
     """
     
-    np.random.seed(seed)
+    #np.random.seed(seed)
     density    = np.ones((1000,1000))
     n=1000
     for i in range(n):
@@ -54,7 +51,7 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
 	    density[:,i]=np.power(((3.6)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "test.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
+    filename = "autoencoder-second-degree-big.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -68,9 +65,9 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
     cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
     cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
     
-    W=connect(cells_pos, n_input_cells, n_output_cells)
+    W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma)
 
-    W*=(2*np.random.random(W.shape)-1)
+
     return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]#, W_in, W_out, bias
     
 
@@ -104,15 +101,41 @@ def backward(x_in, w, t, in_index, out_index, alpha):
         e.append(dsigmoid(w.dot(X[i]))*np.transpose(w).dot(e[t-2-i]))
     for i in range(t):
         for j in range(x_in.shape[1]):
-            w-=alpha*np.outer(e[t-1-i][:,j], X[i][:,j])
-            
-    return  w#, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape*x_in.shape[1])
+            w-=alpha*np.outer(e[t-1-i][:,j], X[i][:,j])*W  #        looooooooooooooooooooook heeeeeeeeeeeeeeeeeere
+    return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
 
+def err(x_in, w, t):
+    X, x_out=forward(x_in, w, t)
+    x_in_reshape=np.zeros(x_in.shape)
+    x_in_reshape[out_index]=x_in[in_index]
+
+    mask = np.ones(len(x_out), dtype=bool)
+    mask[out_index] = False
+    x_out_reshape=x_out
+    x_out_reshape[mask]=0
+    return (np.sum(np.abs(x_out_reshape-x_in_reshape)))/(in_index.shape[0]*x_in.shape[1]), np.max(x_out_reshape-x_in_reshape)
+
+    
     
 def train(x_in, w, t, in_index, out_index, iterr, alpha):
     error=np.zeros(iterr)
+    c=0
     for i in range(iterr):
-            w= backward(x_in, w, t, in_index, out_index, alpha)
+        #x_batch=x_in[:,c:c+32]
+        #c+=32
+        #if c>dataset_size-34:
+        #    c=0
+        alpha*=(10)**(1/(-iterr))
+        w,  error[i] = backward(x_in, w, t, in_index, out_index, alpha)
+        """
+        if a==100:
+            X, x=forward(x_in, w, t)
+            plt.plot(np.linspace(-1, 1, size),scaled_data)
+            plt.plot(np.linspace(-1, 1, size),x[out_index])
+            plt.show()
+            a=0
+        a+=1
+        """
     plt.semilogy(error)
     return w, error[iterr-1]
 
@@ -125,38 +148,61 @@ def generate_poly(data_size, n, degree):
         return p
     for i in range(n):
         a=2*np.random.random([degree+1])-1
-        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
+        data[:,i]=poly(np.linspace(-1, 1, data_size), a)
     return data
 
-size=5#70
-n_cell=20#300
+
+#global variale
+size=70
+n_cell=300
+dataset_size=100
+dataset_size_t=400
+t=8
+sigma=140
+d=100
+alpha=0.008
+error=[]
+
 
 P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
-
-scaler = preprocessing.MinMaxScaler()#be careful the polynome are in [0,1] maybe you need [-1,1]
-data=generate_poly(size, 2, 50)
-data_t=generate_poly(size, 40, 10)
+wc=copy.deepcopy(W)
+wc*=(2*np.random.random(wc.shape)-1)
+    
+    
+scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
+data=generate_poly(size, dataset_size, 40)
+data_t=generate_poly(size, dataset_size_t, 40)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
-
-y=np.zeros((n_cell,2))
-y[in_index]=scaled_data
-x=np.zeros(n_cell)
-
-a=np.ones(size)
-a[2:5]=0
-a[12:15]=-1
-x[in_index]=a
-
-w,e=train(y, W, 3, in_index, out_index, iterr=5000, alpha=0.04)
-X, x_out=forward(x, W, 10)
-#print(x_out[out_index])
-#print(x[in_index])
-print(e)
-
-
     
-#print(P[cc])
+x=np.zeros((n_cell,dataset_size))
+x[in_index]=scaled_data
+x_t=np.zeros((n_cell,dataset_size_t))
+x_t[in_index]=scaled_data_t
+    
+wc,e=train(x, wc, t, in_index, out_index, 500, alpha)
+
+
+plt.show()
+X, x=forward(x, wc, t)
+plt.plot(np.linspace(-1, 1, size),scaled_data)
+plt.plot(np.linspace(-1, 1, size),x[out_index])
+plt.show()
+
+X, x=forward(x_t[:,0:4], wc, t)
+
+
+for i in range(3):
+    plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
+    plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
+    plt.show()
+
+
+
+
+print(e) 
+print(err(x_t, wc, t)) 
+
 """
 
 
