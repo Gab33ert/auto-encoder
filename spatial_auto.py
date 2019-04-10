@@ -21,7 +21,7 @@ def connect(P, n_input_cells, n_output_cells, d, sigma):
     W = np.zeros((n,n))
     for i in range(n):
         for j in range(n):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2)))& (P[i,0]<P[j,0]):
+            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))) & (P[i,0]<P[j,0]):
                 W[j,i]=1  
     return W
 
@@ -100,8 +100,7 @@ def backward(x_in, w, t, in_index, out_index, alpha):
     for i in range(t-2,-1,-1):
         e.append(dsigmoid(w.dot(X[i]))*np.transpose(w).dot(e[t-2-i]))
     for i in range(t):
-        for j in range(x_in.shape[1]):
-            w-=alpha*np.outer(e[t-1-i][:,j], X[i][:,j])*W  #        looooooooooooooooooooook heeeeeeeeeeeeeeeeeere
+        w-=alpha*e[t-1-i].dot(np.transpose(X[i]))*W
     return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
 
 def err(x_in, w, t):
@@ -125,7 +124,7 @@ def train(x_in, w, t, in_index, out_index, iterr, alpha):
         #c+=32
         #if c>dataset_size-34:
         #    c=0
-        alpha*=(10)**(1/(-iterr))
+        alpha*=(5)**(1/(-iterr))
         w,  error[i] = backward(x_in, w, t, in_index, out_index, alpha)
         """
         if a==100:
@@ -138,6 +137,21 @@ def train(x_in, w, t, in_index, out_index, iterr, alpha):
         """
     plt.semilogy(error)
     return w, error[iterr-1]
+
+def visualize(in_index, t):
+    index=in_index
+    for i in range(t):
+        print(t)
+        plt.scatter(P[index][:,0],P[index][:,1])
+        axes = plt.gca()
+        axes.set_xlim([0,1])
+        plt.show()
+        x=np.zeros(W.shape[0])
+        for i in index:x[i]=1
+        x=W.dot(x)
+        x=(x > 0).astype(int)
+        index=[idx for idx, v in enumerate(x) if v]
+    
 
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
@@ -152,15 +166,15 @@ def generate_poly(data_size, n, degree):
     return data
 
 
-#global variale
+#global variable
 size=70
 n_cell=300
-dataset_size=100
+dataset_size=500
 dataset_size_t=400
 t=8
 sigma=140
 d=100
-alpha=0.008
+alpha=0.001
 error=[]
 
 
@@ -168,10 +182,10 @@ P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
 wc=copy.deepcopy(W)
 wc*=(2*np.random.random(wc.shape)-1)
     
-    
+
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
-data=generate_poly(size, dataset_size, 40)
-data_t=generate_poly(size, dataset_size_t, 40)
+data=generate_poly(size, dataset_size, 20)
+data_t=generate_poly(size, dataset_size_t, 20)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
     
@@ -179,8 +193,8 @@ x=np.zeros((n_cell,dataset_size))
 x[in_index]=scaled_data
 x_t=np.zeros((n_cell,dataset_size_t))
 x_t[in_index]=scaled_data_t
-    
-wc,e=train(x, wc, t, in_index, out_index, 500, alpha)
+   
+wc,e=train(x, wc, t, in_index, out_index, 100, alpha)#iter 1000
 
 
 plt.show()
@@ -202,116 +216,6 @@ for i in range(3):
 
 print(e) 
 print(err(x_t, wc, t)) 
-
 """
-
-
-def dsigmoid(x):
-    return sigmoid(x)*(1-sigmoid(x))
-
-def forward(x, w):
-    l=len(w)
-    X=[]
-    for i in range(l):
-        X.append(x)
-        x=sigmoid(w[i].dot(x))
-    return X, x
-
-def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actual error
-    X, x_out=forward(x_in,w)
-    l=len(w)-1
-    e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
-    for i in range(l-1,-1,-1):
-        e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
-    for i in range(l+1):
-        for j in range(x_in.shape[1]):
-           w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
-    return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
-
-def err(x_in,w):
-    X, x_out=forward(x_in,w)
-    return np.sum(np.abs((x_out-x_in)))/(x_in.shape[1]*x_in.shape[0])
-    
-def train(x_in, w, iterr, alpha,):
-    error=np.zeros(iterr)
-    for i in range(iterr):
-            w, error[i] = backprop(x_in, w, alpha)
-    plt.semilogy(error)
-    return w, error[iterr-1]
-
-
-
-
-def generate_poly(data_size, n, degree):
-    data=np.zeros((data_size, n))
-    def poly(x, param):
-        p=0
-        for i in range(len(param)):
-            p=p*x+param[i]
-        return p
-    for i in range(n):
-        a=2*np.random.random([degree+1])-1
-        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
-    return data
-
-
-
-# Build
-# ------
-#P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
- 
-l=5    
-size=100
-
-P, W = build(300, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=1)
-w=copy.deepcopy(W)
-
-w[0]=(2*np.random.random(w[0].shape)-1)*w[0]
-for i in range(1,len(w)):
-    w[i]=(2*np.random.random(w[i].shape)-1)*w[i]
-    print(w[i].shape)
-
-
-scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 40, 10)
-data_t=generate_poly(size, 10, 10)
-scaled_data=scaler.fit_transform(data)
-scaled_data_t=scaler.fit_transform(data_t)
-#unscaled_data=scaler.inverse_transform(scaled_data)
-
-data=np.random.random([size,10])
-a,b=train(scaled_data, w, 50000, 0.02)
-
-X, x=forward(scaled_data,w)
-print(b)
-print("test", err(scaled_data_t,w))
-
-#for i in range(6):
-#    print(w[i]-W[i])
-#print(w)
-
-#print(b)
-"""
-"""
-w=copy.deepcopy(W)
-
-a,b=train(x, w, 10000, 3)
-print(b)
-for i in range(len(a)):
-    print(a[i].shape)
-"""
-"""
-
-#print('{0:1.2e}'.format(b))
-li=[0.5]
-for i in range(3):
-    li.append(li[i]*1.8)
-c=[]
-for i in li:
-    w=copy.deepcopy(W)
-    a,b=train(x, w, 10000, i)
-    print(b, i)
-    c.append(b)
-plt.show()
-plt.loglog(li, c)
-"""
+visualize(in_index[10:11],15)
+"""    

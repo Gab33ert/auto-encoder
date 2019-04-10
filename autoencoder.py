@@ -153,8 +153,7 @@ def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actu
     for i in range(l-1,-1,-1):
         e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
     for i in range(l+1):
-        for j in range(x_in.shape[1]):
-            w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])*W[i]
+        w[i]-=alpha*e[l-i].dot(np.transpose(X[i]))*W[i]
     return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
 
 def err(x_in,w):
@@ -201,8 +200,8 @@ for i in range(1,len(w)):
     w[i]=(2*np.random.random(w[i].shape)-1)*w[i]
 
 scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 800, 40)
-data_t=generate_poly(size, 40, 40)
+data=generate_poly(size, 800, 20)
+data_t=generate_poly(size, 40, 20)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
 
