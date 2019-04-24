@@ -11,13 +11,10 @@ np.set_printoptions(threshold=np.inf)
 import tensorflow as tf
 import time
 from numpy.core.umath_tests import inner1d
-
+from mpl_toolkits.mplot3d import Axes3D as ax3
 
 #build graph
 def connect(P, n_input_cells, n_output_cells, d, sigma):
-
-    
-
     n = len(P)
     dP = P.reshape(1,n,2) - P.reshape(n,1,2)
     # Shifted Distances 
@@ -35,6 +32,34 @@ def connect(P, n_input_cells, n_output_cells, d, sigma):
                 W[j,i]=1
     """
     return W
+
+def connect_3d(P, d, sigma):
+    n = len(P)
+    dP = P.reshape(1,n,3) - P.reshape(n,1,3)
+    # Shifted Distances 
+    D = np.hypot(dP[...,0], dP[...,1])
+    D = np.hypot(D, dP[...,2]+d)
+    #W = np.zeros((n,n))
+    W=np.where((np.random.uniform(0,1,(n,n)) < np.exp(-(D**2)/(2*sigma**2))), 1, 0)
+    s=np.argwhere(W==1)
+    for i in range(s.shape[0]):
+        if(P[s[i,1],2]>=P[s[i,0],2]):
+            W[s[i,0],s[i,1]]=0
+    return W
+
+def build_3d(n):
+    i=28
+    cells_pos=np.zeros((n*i*i,3))
+    for z in range(n):
+        for y in range(i):
+            for x in range(i):
+                if np.random.random()<((n-z)/n)**2:
+                    cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
+    cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
+    cells_pos[:,2]+=(1000/27)*np.random.random(cells_pos[:,2].shape)
+    return cells_pos/1000, connect_3d(cells_pos, d, sigma), np.arange(28*28)
 
 
 def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, seed=0):
@@ -291,7 +316,23 @@ def visualize(in_index, t):
         index=[idx for idx, v in enumerate(x) if v]
     print(l)
  
-
+def visualize_3d(in_index, t):
+    index=in_index
+    l=[]
+    for i in range(t):
+        l.append(len(index))
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.scatter(P[index][:,0],P[index][:,1], P[index][:,2])
+        ax.scatter(P[:,0],P[:,1], P[:,2], s=1)
+        plt.show()
+        x=np.zeros(W.shape[0])
+        for i in index:x[i]=1
+        x=W.dot(x)
+        x=(x > 0).astype(int)
+        index=[idx for idx, v in enumerate(x) if v]
+    print(l)
+ 
 
 #global variable
 size=784
@@ -299,8 +340,8 @@ n_cell=1600
 dataset_size=1000
 dataset_size_t=300
 t=5
-sigma=100
-d=480
+sigma=90
+d=260
 alpha=0.0005#backprop rate
 
 epsilon_w=0.001#rbm rate
@@ -308,12 +349,20 @@ epsilon_b=epsilon_w
 epsilon_c=epsilon_w
 
 
+P, W,in_index =build_3d(5)
+#P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
 
-P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
 
 Wt=abstract_layer(in_index, W, t)
 w=[]
 b=[]
+
+f, axarr = plt.subplots(4, sharex=True)
+axarr[0].hist(np.sum(Wt[0],axis=1), bins=np.max(np.sum(Wt[0],axis=1)))
+axarr[1].hist(np.sum(Wt[1],axis=1), bins=np.max(np.sum(Wt[1],axis=1)))
+axarr[2].hist(np.sum(Wt[2],axis=1), bins=np.max(np.sum(Wt[2],axis=1)))
+axarr[3].hist(np.sum(Wt[3],axis=1), bins=np.max(np.sum(Wt[3],axis=1)))
+plt.show()
 
 for i in range(len(Wt)):
     wc=copy.deepcopy(Wt[i])
@@ -346,30 +395,25 @@ x_test=np.asarray(x_test).reshape(dataset_size_t,-1)
 x_test=np.transpose(scaler.transform(x_test))#np.transpose(preprocessing.scale(x_test, axis=1))
 
     
-"""
-x=np.zeros((n_cell,dataset_size))
-x_train=np.transpose(np.asarray(x_train).reshape(dataset_size,-1))
-x[in_index]=x_train
-x_t=np.zeros((n_cell,dataset_size_t))
-x_test=np.transpose(np.asarray(x_test).reshape(400,-1))
-x_t[in_index]=x_test
-"""
 
 x_test_copy=x_test
 
+index=np.arange(2)+330
+index[0]+=40
 
-visualize(in_index, t)
+visualize_3d(in_index, t)
+
 answer = input("Do you want to keep going y/n?")
 if answer == "y":
     mode=0#grbm mode
     #layer 1
     seconds = time.time()
     iterr_rbm=1000
-    epsilon_w=0.01#rbm rate
+    epsilon_w=0.1#rbm rate
     epsilon_b=epsilon_w
     epsilon_c=epsilon_w
     train_rbm(x_train, b[0], b[1], w[0], iterr_rbm, 0)
-    for i in range(2):
+    for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
         plt.imshow(w[0][i,:].reshape(28,28))
         plt.colorbar()
         plt.show()
@@ -384,7 +428,7 @@ if answer == "y":
     #layer 2
     seconds = time.time()
     iterr_rbm=1000
-    epsilon_w=0.05#rbm rate
+    epsilon_w=0.001#rbm rate
     epsilon_b=epsilon_w
     epsilon_c=epsilon_w
     x_train_1=sample_rbm_forward(x_train, b[1], w[0])
@@ -393,7 +437,7 @@ if answer == "y":
     print("layer 2")
     print("error", error(x_test,b[1],b[2],w[1]))
     print("time",time.time()-seconds)
-    
+    """
     #layer 3
     seconds = time.time()
     iterr_rbm=1000
@@ -431,20 +475,5 @@ elif answer == "n":
 else:
     print("Please enter y or n.")
 
-
-"""
-wc,e=train_backprop(x, wc, t, in_index, out_index, 100, alpha)
-
-for i in range(5):
-    plt.imshow(x_test[:,i].reshape(28,28))
-    plt.show()
-    im=np.zeros(n_cell)
-    im[in_index]=x_test[:,i]
-    IM, im=forward(im, wc, t)
-    plt.imshow(im[out_index.reshape(28,28)])
-    plt.show()
-
-print(err(x, wc, t)) 
-print(err(x_t, wc, t)) 
 """
 
