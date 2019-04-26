@@ -62,7 +62,7 @@ def train_rbm(visible, b, c, w, iterr_rbm, t):
         if d>dataset_size-34:
             d=0
         actualise_weight(visible_batch, b, c, w, i+1, 1, t)
-        if i%50==0:
+        if i%(iterr_rbm//20)==0:
             e.append(energy(x_test, b, c, w))
             E.append(energy(visible, b, c, w))
     """
@@ -136,9 +136,9 @@ size=784
 n_cell=1600
 dataset_size=1000
 dataset_size_t=300
-t=5
-sigma=90
-d=260
+t=8
+sigma=5#90
+d=100#260
 alpha=0.0005#backprop rate
 
 epsilon_w=0.001#rbm rate
@@ -146,32 +146,23 @@ epsilon_b=epsilon_w
 epsilon_c=epsilon_w
 
 
-P, W,in_index =top.build_3d(5, d, sigma)
+P, W,in_index =top.build_3d(60, d, sigma)
 Wt=top.abstract_layer(in_index, W, t)
+#for i in range(t-1,0,-1):
+    #at.analyze_topology(Wt, i)
+#for i in range(t-1,0,-1):
+    #at.analyze_topology_froward(Wt,i)
+for i in range(t-1,0,-1):
+    at.analyze_topology_back(Wt,i)
+    
 """
-at.analyze_topology(Wt, 4)
-at.analyze_topology(Wt, 3)
-at.analyze_topology(Wt, 2)
-at.analyze_topology(Wt, 1)
-
-at.analyze_topology_froward(Wt,4)
-at.analyze_topology_froward(Wt,3)
-at.analyze_topology_froward(Wt,2)
-at.analyze_topology_froward(Wt,1)
-
-at.analyze_topology_back(Wt,4)
-at.analyze_topology_back(Wt,3)
-at.analyze_topology_back(Wt,2)
-at.analyze_topology_back(Wt,1)
-"""
-
 f, axarr = plt.subplots(4, sharex=True)                                        #histogram of the number of output neurone recieving 1,2... input neurone at each layer
 axarr[0].hist(np.sum(Wt[0],axis=1), bins=np.max(np.sum(Wt[0],axis=1)))
 axarr[1].hist(np.sum(Wt[1],axis=1), bins=np.max(np.sum(Wt[1],axis=1)))
 axarr[2].hist(np.sum(Wt[2],axis=1), bins=np.max(np.sum(Wt[2],axis=1)))
 axarr[3].hist(np.sum(Wt[3],axis=1), bins=np.max(np.sum(Wt[3],axis=1)))
 plt.show()
-
+"""
 w=[]                                                                           #initialise weight and bias
 b=[]#forward bias
 c=[]#backward bias
@@ -209,12 +200,12 @@ if answer == "y":
     mode=0#grbm mode
     #layer 1
     seconds = time.time()
-    iterr_rbm=1000
-    epsilon_w=0.1#rbm rate
+    iterr_rbm=2000
+    epsilon_w=0.001#rbm rate
     epsilon_b=epsilon_w
     epsilon_c=epsilon_w
     train_rbm(x_train, b[0], c[0], w[0], iterr_rbm, 0)
-    for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
+    for i in range(0,700,100):
         plt.imshow(w[0][i,:].reshape(28,28))
         plt.colorbar()
         plt.show()
@@ -228,7 +219,7 @@ if answer == "y":
     
     #layer 2
     seconds = time.time()
-    iterr_rbm=2000
+    iterr_rbm=200
     epsilon_w=0.1#rbm rate
     epsilon_b=epsilon_w
     epsilon_c=epsilon_w
@@ -238,7 +229,8 @@ if answer == "y":
     print("layer 2")
     print("error", error(x_test,b[1],c[1],w[1]))
     print("time",time.time()-seconds)
-
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 1)
+    
     #layer 3
     seconds = time.time()
     iterr_rbm=1000
@@ -251,6 +243,7 @@ if answer == "y":
     print("layer 3")
     print("error", error(x_test,b[2],b[3],w[2]))
     print("time",time.time()-seconds)
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 2)
 
     #layer 4
     seconds = time.time()
@@ -264,8 +257,50 @@ if answer == "y":
     print("layer 4")
     print("error", error(x_test,b[3],c[3],w[3]))
     print("time",time.time()-seconds)
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 3)
     
+    #layer 5
+    seconds = time.time()
+    iterr_rbm=5000
+    epsilon_w=0.01#rbm rate
+    epsilon_b=epsilon_w
+    epsilon_c=epsilon_w
+    x_train_4=sample_rbm_forward(x_train_3, c[3], w[3])
+    x_test=sample_rbm_forward(x_test, c[3], w[3])
+    train_rbm(x_train_4, b[4],c[4],w[4], iterr_rbm, 4)
+    print("layer 5")
+    print("error", error(x_test,b[4],c[4],w[4]))
+    print("time",time.time()-seconds)
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 4)
     
+    #layer 6
+    seconds = time.time()
+    iterr_rbm=5000
+    epsilon_w=0.01#rbm rate
+    epsilon_b=epsilon_w
+    epsilon_c=epsilon_w
+    x_train_5=sample_rbm_forward(x_train_4, c[4], w[4])
+    x_test=sample_rbm_forward(x_test, c[4], w[4])
+    train_rbm(x_train_5, b[5],c[5],w[5], iterr_rbm, 5)
+    print("layer 6")
+    print("error", error(x_test,b[5],c[5],w[5]))
+    print("time",time.time()-seconds)
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 5)
+    
+    #layer 7
+    seconds = time.time()
+    iterr_rbm=5000
+    epsilon_w=0.01#rbm rate
+    epsilon_b=epsilon_w
+    epsilon_c=epsilon_w
+    x_train_6=sample_rbm_forward(x_train_5, c[5], w[5])
+    x_test=sample_rbm_forward(x_test, c[5], w[5])
+    train_rbm(x_train_6, b[6],c[6],w[6], iterr_rbm, 6)
+    print("layer 7")
+    print("error", error(x_test,b[6],c[6],w[6]))
+    print("time",time.time()-seconds)
+    gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 6)
+      
     gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 0)
     gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 1)
     gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 2)
