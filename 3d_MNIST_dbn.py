@@ -12,188 +12,17 @@ import tensorflow as tf
 import time
 from numpy.core.umath_tests import inner1d
 from mpl_toolkits.mplot3d import Axes3D as ax3
-
-#build graph
-def connect(P, n_input_cells, n_output_cells, d, sigma):
-    n = len(P)
-    dP = P.reshape(1,n,2) - P.reshape(n,1,2)
-    # Shifted Distances 
-    D = np.hypot(dP[...,0]+d, dP[...,1])
-    #W = np.zeros((n,n))
-    W=np.where((np.random.uniform(0,1,(n,n)) < np.exp(-(D**2)/(2*sigma**2))), 1, 0)
-    s=np.argwhere(W==1)
-    for i in range(s.shape[0]):
-        if(P[s[i,1],0]>P[s[i,0],0]):
-            W[s[i,0],s[i,1]]=0
-    """
-    for i in range(n):
-        for j in range(n):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))) & (P[i,0]<P[j,0]):
-                W[j,i]=1
-    """
-    return W
-
-def connect_3d(P, d, sigma):
-    n = len(P)
-    dP = P.reshape(1,n,3) - P.reshape(n,1,3)
-    # Shifted Distances 
-    D = np.hypot(dP[...,0], dP[...,1])
-    D = np.hypot(D, dP[...,2]+d)
-    #W = np.zeros((n,n))
-    W=np.where((np.random.uniform(0,1,(n,n)) < np.exp(-(D**2)/(2*sigma**2))), 1, 0)
-    s=np.argwhere(W==1)
-    for i in range(s.shape[0]):
-        if(P[s[i,1],2]>=P[s[i,0],2]):
-            W[s[i,0],s[i,1]]=0
-    return W
-
-def build_3d(n):
-    i=28
-    cells_pos=np.zeros((n*i*i,3))
-    for z in range(n):
-        for y in range(i):
-            for x in range(i):
-                if np.random.random()<((n-z)/n)**2:
-                    cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
-                    cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
-                    cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
-    cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
-    cells_pos[:,2]+=(1000/27)*np.random.random(cells_pos[:,2].shape)
-    return cells_pos/1000, connect_3d(cells_pos, d, sigma), np.arange(28*28)
-
-
-def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, seed=0):
-    """
-
-    Parameters:
-    -----------
-
-    n_cells:        Number of cells in the reservoir
-    n_input_cells:  Number of cells receiving external input
-    n_output_cells: Number of cells sending external output
-    n_input:        Number of external input
-    n_output:       Number of external output
-    sparsity:       Connection rate
-    seed:           Seed for the random genrator
-
-    
-    """
-
-    #np.random.seed(seed)
-    density    = np.ones((1000,1000))
-    n=1000
-    for i in range(n):
-	    ii=i/(n-1)
-	    density[:,i]=np.power((ii*(ii-2)+1)*np.ones((1,n)),6) #neurone density
-    density_P  = density.cumsum(axis=1)
-    density_Q  = density_P.cumsum(axis=1)
-    filename = "autoencoder-rbm-MNIST.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
-    if not os.path.exists(filename):
-        cells_pos = np.zeros((n_cells,2))
-        cells_pos[:,0] = np.random.uniform(0, 1000, n_cells)
-        cells_pos[:,1] = np.random.uniform(0, 1000, n_cells)
-        for i in tqdm.trange(75):
-            _, cells_pos = voronoi.centroids(cells_pos, density, density_P, density_Q)
-        np.save(filename, cells_pos)
-
-    cells_pos = np.load(filename)
-    cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
-    cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
-
-    W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma)
-
-    return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]
-    
-def abstract_layer(in_index, W, t):#unfold the total connection matrix into layer by layer connection matrix
-    index=in_index
-    Wt=[]
-    for i in range(t-1):
-        x=np.zeros(W.shape[0])
-        for i in index:x[i]=1
-        x=W.dot(x)
-        x=(x > 0).astype(int)
-        index_new=np.asarray([idx for idx, v in enumerate(x) if v])
-        Wt.append(W[index_new[:, None], index])
-        index=index_new
-    return Wt
-
-
-#BACKPROP
-def sigmoid(x):
-    return (2/(1+np.exp(-x)))-1
-
-def dsigmoid(x):
-    f=sigmoid(x)
-    return -(f+1)*(f-1)/2
-
-def forward(x, w, t):
-    X=[]
-    for i in range(t):
-        X.append(x)
-        x=sigmoid(w.dot(x))
-    return X, x
-
-def backward(x_in, w, t, in_index, out_index, alpha):
-    X, x_out=forward(x_in, w, t)
-    x_in_reshape=np.zeros(x_in.shape)
-    x_in_reshape[out_index]=x_in[in_index]
-
-    mask = np.ones(len(x_out), dtype=bool)
-    mask[out_index] = False
-    x_out_reshape=x_out
-    x_out_reshape[mask]=0
-
-    e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
-    for i in range(t-2,-1,-1):
-        e.append(dsigmoid(w.dot(X[i]))*np.transpose(w).dot(e[t-2-i]))
-    for i in range(t):
-        w-=alpha*e[t-1-i].dot(np.transpose(X[i]))*W
-    return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
-
-def err(x_in, w, t):
-    X, x_out=forward(x_in, w, t)
-    x_in_reshape=np.zeros(x_in.shape)
-    x_in_reshape[out_index]=x_in[in_index]
-
-    mask = np.ones(len(x_out), dtype=bool)
-    mask[out_index] = False
-    x_out_reshape=x_out
-    x_out_reshape[mask]=0
-    return (np.sum(np.abs(x_out_reshape-x_in_reshape)))/(in_index.shape[0]*x_in.shape[1]), np.max(x_out_reshape-x_in_reshape)
-
-    
-    
-def train_backprop(x_in, w, t, in_index, out_index, iterr, alpha):
-    error=np.zeros(iterr)
-    c=0
-    for i in range(iterr):
-        print(i)
-        #x_batch=x_in[:,c:c+32]
-        #c+=32
-        #if c>dataset_size-34:
-        #    c=0
-        alpha*=(5)**(1/(-iterr))
-        w,  error[i] = backward(x_in, w, t, in_index, out_index, alpha)
-        """
-        if a==100:
-            X, x=forward(x_in, w, t)
-            plt.plot(np.linspace(-1, 1, size),scaled_data)
-            plt.plot(np.linspace(-1, 1, size),x[out_index])
-            plt.show()
-            a=0
-        a+=1
-        """
-    plt.semilogy(error)
-    plt.show()
-    return w, error[iterr-1]
-
+import topology as top
+import function as func
+import analyzeTools as at
+import backprop
 
 #RBM
 def sample_rbm_forward(visible, c, w):
-    return np.where(np.random.rand(w.shape[0],visible.shape[1]) < sigmoid(np.tile(c,(1,visible.shape[1]))+w.dot(visible)), 1, -1)
+    return np.where(np.random.rand(w.shape[0],visible.shape[1]) < func.sigmoid(np.tile(c,(1,visible.shape[1]))+w.dot(visible)), 1, -1)
 
 def sample_rbm_backward(hidden, c, w):
-    return np.where(np.random.rand(w.shape[1],hidden.shape[1]) < sigmoid(np.tile(c,(1,hidden.shape[1]))+np.transpose(w).dot(hidden)), 1, -1)
+    return np.where(np.random.rand(w.shape[1],hidden.shape[1]) < func.sigmoid(np.tile(c,(1,hidden.shape[1]))+np.transpose(w).dot(hidden)), 1, -1)
 
 def sample_grbm_backward(hidden, b, w):
     return np.random.normal(np.tile(b,(1,hidden.shape[1]))+np.transpose(w).dot(hidden),0.01)#np.where(np.random.rand(w.shape[1],hidden.shape[1]) < sigmoid(np.tile(b,(1,hidden.shape[1]))+np.transpose(w).dot(hidden)), 0, 1) #this is no more sampling!!!!!!!!!!!!!
@@ -299,83 +128,6 @@ def error(visible, b,c,w):
 
 
 
-#TOOLS
-def visualize(in_index, t):
-    index=in_index
-    l=[]
-    for i in range(t):
-        l.append(len(index))
-        plt.scatter(P[:,0],P[:,1], s=3)
-        plt.scatter(P[index][:,0],P[index][:,1], s=3)
-        axes = plt.gca()
-        axes.set_xlim([0,1])
-        plt.show()
-        x=np.zeros(W.shape[0])
-        for i in index:x[i]=1
-        x=W.dot(x)
-        x=(x > 0).astype(int)
-        index=[idx for idx, v in enumerate(x) if v]
-    print(l)
- 
-def visualize_3d(in_index, t):
-    index=in_index
-    l=[]
-    for i in range(t):
-        l.append(len(index))
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.scatter(P[index][:,0],P[index][:,1], P[index][:,2])
-        ax.scatter(P[:,0],P[:,1], P[:,2], s=1)
-        plt.show()
-        x=np.zeros(W.shape[0])
-        for i in index:x[i]=1
-        x=W.dot(x)
-        x=(x > 0).astype(int)
-        index=[idx for idx, v in enumerate(x) if v]
-    print(l)
-
-    
-def analyze_topology_back(Wt, depth):
-    n=Wt[depth-1].shape[0]
-    l=[]
-    for j in range(n):
-        out=np.zeros((n,1))
-        out[j,0]=1
-        for i in range(depth):
-            out=np.transpose(out).dot(Wt[depth-1-i])
-            out=np.transpose((out > 0).astype(int))
-        l.append(100*np.sum(out)/out.shape[0])
-    plt.hist(l)
-    plt.title("backward depth "+str(depth))
-    #plt.ylim(bottom=0)
-    plt.show()
-    
-def analyze_topology(Wt, depth):
-    n=Wt[depth-1].shape[0]
-    out=np.ones((n,1))
-    for i in range(depth):
-        out=np.transpose(out).dot(Wt[depth-1-i])
-        out=np.transpose((out > 0).astype(int))
-    print(100*np.sum(out)/out.shape[0])
-    
-
-def analyze_topology_froward(Wt, depth):
-    l=[]    
-    n=Wt[0].shape[1]
-    for j in range(n):
-        x=np.zeros((n,1))
-        x[j,0]=1
-        for i in range(depth):
-            x=Wt[i].dot(x)
-            x=(x > 0).astype(int)
-        l.append(100*np.sum(x)/x.shape[0])
-    plt.hist(l)
-    plt.title("forward depth "+str(depth))
-    #plt.ylim(bottom=0)
-    plt.show()
-
- 
-
 #global variable
 size=784
 n_cell=1600
@@ -391,23 +143,24 @@ epsilon_b=epsilon_w
 epsilon_c=epsilon_w
 
 
-P, W,in_index =build_3d(5)
-Wt=abstract_layer(in_index, W, t)
+P, W,in_index =top.build_3d(5, d, sigma)
+
+Wt=top.abstract_layer(in_index, W, t)
 """
-analyze_topology(Wt, 4)
-analyze_topology(Wt, 3)
-analyze_topology(Wt, 2)
-analyze_topology(Wt, 1)
+at.analyze_topology(Wt, 4)
+at.analyze_topology(Wt, 3)
+at.analyze_topology(Wt, 2)
+at.analyze_topology(Wt, 1)
 
-analyze_topology_froward(Wt,4)
-analyze_topology_froward(Wt,3)
-analyze_topology_froward(Wt,2)
-analyze_topology_froward(Wt,1)
+at.analyze_topology_froward(Wt,4)
+at.analyze_topology_froward(Wt,3)
+at.analyze_topology_froward(Wt,2)
+at.analyze_topology_froward(Wt,1)
 
-analyze_topology_back(Wt,4)
-analyze_topology_back(Wt,3)
-analyze_topology_back(Wt,2)
-analyze_topology_back(Wt,1)
+at.analyze_topology_back(Wt,4)
+at.analyze_topology_back(Wt,3)
+at.analyze_topology_back(Wt,2)
+at.analyze_topology_back(Wt,1)
 """
 
 f, axarr = plt.subplots(4, sharex=True)                                        #histogram of the number of output neurone recieving 1,2... input neurone at each layer
@@ -448,7 +201,7 @@ x_test=np.transpose(scaler.transform(x_test))#np.transpose(preprocessing.scale(x
 
 x_test_copy=x_test
 
-visualize_3d(in_index, t)
+at.visualize_3d(in_index, t)
 
 answer = input("Do you want to keep going y/n?")
 if answer == "y":
