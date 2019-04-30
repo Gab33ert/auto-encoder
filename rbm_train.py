@@ -7,6 +7,7 @@ Created on Mon Apr 29 10:56:41 2019
 """
 import matplotlib.pyplot as plt
 import numpy as np
+import time
 
 import function as func
 import rbm_visualize as rbmv
@@ -47,10 +48,16 @@ def actualise_weight(visible, b, c, w, k, epsilon, mode):
 
   
 def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size):
+    ind=[]
     e=[]
     E=[]
+    fe=[]
+    fE=[]
     d=0
     f=0
+    
+    t1=0
+    t2=0
     for i in range(iterr_rbm):
         visible_batch=visible[:,d:d+32]
         #visible_batch=visible_batch.reshape(visible.shape[0],1)
@@ -62,8 +69,25 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size):
             d=0
         actualise_weight(visible_batch, b, c, w, 1, epsilon, mode)
         if i%(iterr_rbm//20)==0:
-            e.append(rbmv.energy(x_test, b, c, w))
-            E.append(rbmv.energy(visible, b, c, w))
+            ind.append(i)
+            if mode==0:
+                tt=time.time()
+                e.append(rbmv.energy_grbm(x_test, b, c, w))
+                E.append(rbmv.energy_grbm(visible, b, c, w))
+                t1+=time.time()-tt
+                tt=time.time()
+                fe.append(rbmv.pseudo_likelihood_grbm(x_test, b, c, w, 10))
+                fE.append(rbmv.pseudo_likelihood_grbm(visible, b, c, w, 3))
+                t2+=time.time()-tt
+            else:
+                tt=time.time()
+                e.append(rbmv.energy_rbm(x_test, b, c, w))
+                E.append(rbmv.energy_rbm(visible, b, c, w))
+                t1+=time.time()-tt
+                tt=time.time()
+                fe.append(rbmv.pseudo_likelihood_rbm(x_test, b, c, w, 10))
+                fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
+                t2+=time.time()-tt
     """
     for i in range(iterr_rbm//3):
         actualise_weight(visible, b, c, w, i+1, 3, t)
@@ -71,17 +95,28 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size):
             e.append(energy(x_test, b, c, w))
             E.append(energy(x_train, b, c, w))    
     """
-    plt.plot(e,label="test set")
-    plt.plot(E, label="training set")
+    plt.plot(ind, e,label="test set")
+    plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
-    plt.yscale('symlog')
+    if mode == 1:
+        plt.yscale('symlog')
+    plt.show()
+    plt.plot(ind, fe, label="free energy test set")
+    plt.plot(ind, fE, label="free energy training set")
+    plt.legend(loc='lower right')
     plt.show()
     print("energy", e[len(e)-1])
+    print("energy time and pseudo likelihood time ", t1, t2)
 
     
 def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, Wt):
     e=[]
     E=[]
+    fe=[]
+    fE=[]
+    ind=[]
+    t1=0
+    t2=0
     d=0
     f=0
     for i in range(iterr_rbm):
@@ -95,8 +130,25 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
             d=0
         spatial_actualise_weight(visible_batch, b, c, w, 1, epsilon, mode, Wt)
         if i%(iterr_rbm//20)==0:
-            e.append(rbmv.energy(x_test, b, c, w))
-            E.append(rbmv.energy(visible, b, c, w))
+            ind.append(i)
+            if mode==0:
+                tt=time.time()
+                e.append(rbmv.energy_grbm(x_test, b, c, w))
+                E.append(rbmv.energy_grbm(visible, b, c, w))
+                t1+=time.time()-tt
+                tt=time.time()
+                fe.append(rbmv.pseudo_likelihood_grbm(x_test, b, c, w, 10))
+                fE.append(rbmv.pseudo_likelihood_grbm(visible, b, c, w, 3))
+                t2+=time.time()-tt
+            else:
+                tt=time.time()
+                e.append(rbmv.energy_rbm(x_test, b, c, w))
+                E.append(rbmv.energy_rbm(visible, b, c, w))
+                t1+=time.time()-tt
+                tt=time.time()
+                fe.append(rbmv.pseudo_likelihood_rbm(x_test, b, c, w, 10))
+                fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
+                t2+=time.time()-tt
     """
     for i in range(iterr_rbm//3):
         actualise_weight(visible, b, c, w, i+1, 3, t)
@@ -104,10 +156,16 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
             e.append(energy(x_test, b, c, w))
             E.append(energy(x_train, b, c, w))    
     """
-    plt.plot(e,label="test set")
-    plt.plot(E, label="training set")
+    plt.plot(ind, e,label="test set")
+    plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
-    plt.yscale('symlog')
+    if mode == 1:
+        plt.yscale('symlog')
+    plt.show()
+    plt.plot(ind, fe, label="free energy test set")
+    plt.plot(ind, fE, label="free energy training set")
+    plt.legend(loc='lower right')
     plt.show()
     print("energy", e[len(e)-1])
+    print("energy time and pseudo likelihood time ", t1, t2)
 

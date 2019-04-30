@@ -8,28 +8,74 @@ Created on Mon Apr 29 11:03:45 2019
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.core.umath_tests import inner1d
+import copy
 
 import rbm_train as rbmt
+import function as func
 
 
-def energy(visible, b, c, w):
+def energy_rbm(visible, b, c, w):
     e=0
     hidden=rbmt.sample_rbm_forward(visible, c, w)
     e+=-np.sum(b*visible)-np.sum(c*hidden)-np.sum(inner1d(hidden, w.dot(visible)))
     return e/(visible.shape[1]) 
-        
- 
-def gibbs_sampling(visible, b, c, w, n, scaler):
-    plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(28,28), vmin=-100, vmax= 400)
-    plt.colorbar()
-    plt.show()
-    a=visible
+
+def energy_grbm(visible, b, c, w):
+    e=0
+    hidden=rbmt.sample_rbm_forward(visible, c, w)
+    e+=np.sum(np.power(b-visible, 2)/2)-np.sum(c*hidden)-np.sum(inner1d(hidden, w.dot(visible)))
+    return e/(visible.shape[1]) 
+    
+def free_energy_rbm(visible, b, c, w):
+    a=np.exp(w.dot(visible)+np.tile(c,(1,visible.shape[1])))
+    return np.mean(-np.transpose(b).dot(visible)-np.sum(np.log(a+np.power(a,-1)), axis=0))
+
+def free_energy_grbm(visible, b, c, w):
+    a=np.exp(w.dot(visible)+np.tile(c,(1,visible.shape[1])))
+    return np.mean(np.sum(np.power(np.tile(b,(1,visible.shape[1]))-visible, 2), axis=0)/2-np.sum(np.log(a+np.power(a,-1)), axis=0))
+
+def flip(visible):
+    i=np.random.randint(0, visible.shape[0])
+    a=copy.deepcopy(visible)
+    a[i,:]=-visible[i,:]
+    return a
+
+def pseudo_likelihood_rbm(visible, b, c, w, n):
+    l=0
     for i in range(n):
-        hidden=rbmt.sample_rbm_forward(a, c, w)
-        visible=rbmt.sample_grbm_backward(hidden, b, w)
-    plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(28,28), vmin=-100, vmax= 400)
-    plt.colorbar()
-    plt.show()
+        l+=np.log((func.sigmoid(free_energy_rbm(flip(visible),b,c,w)-free_energy_rbm(visible,b,c,w))+1)/2)
+    return visible.shape[0]*l/n
+
+def pseudo_likelihood_grbm(visible, b, c, w, n):
+    l=0
+    for i in range(n):
+        l+=np.log((func.sigmoid(free_energy_grbm(flip(visible),b,c,w)-free_energy_grbm(visible,b,c,w))+1)/2)
+    return visible.shape[0]*l/n
+
+
+def gibbs_sampling(visible, b, c, w, n, scaler, mode):
+    if mode==0:
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(28,28), vmin=-100, vmax= 400)
+        plt.colorbar()
+        plt.show()
+        a=visible
+        for i in range(n):
+            hidden=rbmt.sample_rbm_forward(a, c, w)
+            visible=rbmt.sample_grbm_backward(hidden, b, w)
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(28,28), vmin=-100, vmax= 400)
+        plt.colorbar()
+        plt.show()
+    else:
+        plt.imshow(visible.reshape(28,28))
+        plt.colorbar()
+        plt.show()
+        a=visible
+        for i in range(n):
+            hidden=rbmt.sample_rbm_forward(a, c, w)
+            visible=rbmt.sample_rbm_backward(hidden, b, w)
+        plt.imshow(visible.reshape(28,28))
+        plt.colorbar()
+        plt.show()        
     
 def gibbs_deep_sampling(visible, b, c, w, n, scaler):
     #plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(28,28), vmin=-100, vmax= 400)
