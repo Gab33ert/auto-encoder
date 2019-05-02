@@ -56,16 +56,22 @@ def analyze_topology_back(Wt, depth):
     n=Wt[depth-1].shape[0]
     l=[]
     for j in range(n):
-        out=np.zeros((n,1))
-        out[j,0]=1
+        out=np.zeros((1,n))
+        out[0,j]=1
         for i in range(depth):
-            out=np.transpose(out).dot(Wt[depth-1-i])
-            out=np.transpose((out > 0).astype(int))
-        l.append(100*np.sum(out)/out.shape[0])
+            out=out.dot(Wt[depth-1-i])
+            out=(out > 0).astype(int)
+        l.append(100*np.sum(out)/out.shape[1])
     plt.hist(l,weights=np.ones(len(l)) / len(l))
     plt.title("backward depth "+str(depth))
     #plt.ylim(bottom=0)
     plt.show()
+
+def connection_backward_rate(Wt):
+    for i in range(len(Wt)):
+        plt.hist(np.sum(Wt[i], axis=1)/Wt[i].shape[1],weights=np.ones(Wt[i].shape[0]) / Wt[i].shape[0])
+        plt.title("connection rate from layer "+str(i)+" to "+str(i+1))
+        plt.show()
     
 def analyze_topology(Wt, depth):
     n=Wt[depth-1].shape[0]

@@ -54,7 +54,7 @@ def build_3d(n, d, sigma):                                                     #
     for z in range(n):
         for y in range(i):
             for x in range(i):
-                if np.random.random()<np.exp(-0.25*z):#((n-z)/n)**10:
+                if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
                     cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
                     cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
                     cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
@@ -100,8 +100,11 @@ def connect_3d(P, d, sigma):
 def connect_3d_sharp(P, d, sigma):
     n = len(P)
     dP = P.reshape(1,n,3) - P.reshape(n,1,3)
-    # Shifted Distances 
     D = np.hypot(dP[...,0], dP[...,1])
+    D = np.minimum(np.hypot(dP[...,0]+1000, dP[...,1]),D)
+    D = np.minimum(np.hypot(dP[...,0], dP[...,1]+1000),D) 
+    D = np.minimum(np.hypot(dP[...,0]+1000, dP[...,1]+1000),D)
+    # Shifted Distances 
     D = np.hypot(0.1*D, dP[...,2]+d)
     #W = np.zeros((n,n))
     W=np.where((np.random.uniform(0,1,(n,n)) < np.exp((-np.power(np.maximum(0,D-4*sigma),2))/(2*(sigma/2)**2))), 1, 0)
@@ -126,4 +129,38 @@ def abstract_layer(in_index, W, t):                                            #
         index=index_new
     return Wt
 
+def abstract_layer_restriction(Wt, n, rate):                                           #choose n unit in final layer with high connection to input
+    k=0
+    j=500
+    le=len(Wt)
 
+    index=[]
+    
+    while k<n:
+        if j==Wt[le-1].shape[0]:
+            print("we couldn't find "+str(n)+" final unit")
+            break
+        out=np.zeros((1,Wt[le-1].shape[0]))
+        out[0,j]=1
+        for i in range(le):
+            out=out.dot(Wt[le-1-i])
+            out=(out > 0).astype(int)
+        if np.sum(out)/out.shape[1]> rate:
+            k+=1
+            index.append(j)
+        j+=1
+    
+    print("index", index)
+    
+    out=np.zeros((1,Wt[le-1].shape[0]))
+    out[0][index]=1
+    for i in range(le): 
+        out_n=out.dot(Wt[le-1-i])
+        out_n=(out_n > 0).astype(int)
+        index_n=np.argwhere(out_n==1)[:,1]
+        Wt[le-1-i]=Wt[le-1-i][index,:][:,index_n]
+        out=out_n
+        index=index_n
+        print(Wt[le-1-i].shape)
+    return Wt
+    

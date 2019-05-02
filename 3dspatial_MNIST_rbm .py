@@ -28,31 +28,27 @@ size=784
 n_cell=1600
 dataset_size=1000
 dataset_size_t=300
-t=8
-sigma=5#90
-d=100#260
+t=5
+sigma=4#90
+d=27#260
 alpha=0.0005#backprop rate
 
 epsilon=0.001#rbm rate
 
 
-P, W,in_index =top.build_3d(60, d, sigma)
+P, W,in_index =top.build_3d(6, d, sigma)
 Wt=top.abstract_layer(in_index, W, t)
+at.analyze_topology_back(Wt,4)
+Wt=top.abstract_layer_restriction(Wt, 10, 0.9)
+at.analyze_topology_back(Wt,4)
 #for i in range(t-1,0,-1):
     #at.analyze_topology(Wt, i)
 #for i in range(t-1,0,-1):
     #at.analyze_topology_froward(Wt,i)
 #for i in range(t-1,0,-1):
 #    at.analyze_topology_back(Wt,i)
+#at.connection_backward_rate(Wt)
     
-"""
-f, axarr = plt.subplots(4, sharex=True)                                        #histogram of the number of output neurone recieving 1,2... input neurone at each layer
-axarr[0].hist(np.sum(Wt[0],axis=1), bins=np.max(np.sum(Wt[0],axis=1)))
-axarr[1].hist(np.sum(Wt[1],axis=1), bins=np.max(np.sum(Wt[1],axis=1)))
-axarr[2].hist(np.sum(Wt[2],axis=1), bins=np.max(np.sum(Wt[2],axis=1)))
-axarr[3].hist(np.sum(Wt[3],axis=1), bins=np.max(np.sum(Wt[3],axis=1)))
-plt.show()
-"""
 w=[]                                                                           #initialise weight and bias
 b=[]#forward bias
 c=[]#backward bias
@@ -90,7 +86,7 @@ answer = input("Do you want to keep going y/n?")
 if answer == "y":
 
     mode=0#grbm mode
-
+    """ 
     #layer 1
     seconds = time.time()
     iterr_rbm=1000
@@ -102,10 +98,10 @@ if answer == "y":
         plt.show()
     print("error", rbmv.error(x_test,b[0],c[0],w[0]))
     print("time",time.time()-seconds)
-    rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
-    """ 
+    rbmv.gibbs_sampling(x_test_copy[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
+    rbmv.gibbs_sampling(x_test_copy[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
+    rbmv.gibbs_sampling(x_test_copy[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
+    
     mode=1#rbm mode
     
     #layer 2
@@ -119,7 +115,7 @@ if answer == "y":
     print("error", rbmv.error(x_test,b[1],c[1],w[1]))
     print("time",time.time()-seconds)
     rbmv.gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 1, scaler)
-    
+
     #layer 3
     seconds = time.time()
     iterr_rbm=1000
@@ -185,7 +181,7 @@ if answer == "y":
     rbmv.gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 2, scaler)
     rbmv.gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 3, scaler)
     """
-    """   
+
     mode=0
     seconds = time.time()
     iterr_rbm=2000
@@ -200,14 +196,14 @@ if answer == "y":
     rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
     rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
     rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
-
+ 
     mode=1#rbm mode
     
 
     #layer 2
     seconds = time.time()
     iterr_rbm=1000
-    epsilon=0.05#rbm rate
+    epsilon=0.01#rbm rate
     x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
     x_test=rbmt.sample_rbm_forward(x_test, c[0], w[0])
     rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test, dataset_size)
@@ -215,10 +211,10 @@ if answer == "y":
     print("error", rbmv.error(x_test,b[1],c[1],w[1]))
     print("time",time.time()-seconds)
     rbmv.gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 1, scaler)
-    
+
     #layer 3
     seconds = time.time()
-    iterr_rbm=1000
+    iterr_rbm=2000
     epsilon=0.01#rbm rate
     x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
     x_test=rbmt.sample_rbm_forward(x_test, c[1], w[1])
@@ -230,7 +226,7 @@ if answer == "y":
     
     #layer 4
     seconds = time.time()
-    iterr_rbm=1000
+    iterr_rbm=10000
     epsilon=0.001#rbm rate
     x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
     x_test=rbmt.sample_rbm_forward(x_test, c[2], w[2])
@@ -239,7 +235,7 @@ if answer == "y":
     print("error", rbmv.error(x_test,b[3],c[3],w[3]))
     print("time",time.time()-seconds)
     rbmv.gibbs_deep_sampling(x_test_copy[:,1:2], b, c, w, 3, scaler)
-    
+    """  
     #layer 5
     seconds = time.time()
     iterr_rbm=5000
