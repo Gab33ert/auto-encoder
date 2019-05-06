@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.core.umath_tests import inner1d
 import copy
+import time
 
 import rbm_train as rbmt
 import function as func
@@ -28,11 +29,13 @@ def energy_grbm(visible, b, c, w):
     
 def free_energy_rbm(visible, b, c, w):
     a=np.exp(w.dot(visible)+np.tile(c,(1,visible.shape[1])))
-    return np.mean(-np.transpose(b).dot(visible)-np.sum(np.log(a+np.power(a,-1)), axis=0))
+    return np.mean(-np.transpose(b).dot(visible)-np.sum(np.log(a+np.power(a,-1)), axis=0))#np.power(a,-1)
 
 def free_energy_grbm(visible, b, c, w):
     a=np.exp(w.dot(visible)+np.tile(c,(1,visible.shape[1])))
-    return np.mean(np.sum(np.power(np.tile(b,(1,visible.shape[1]))-visible, 2), axis=0)/2-np.sum(np.log(a+np.power(a,-1)), axis=0))
+    x=np.mean(np.sum(np.power(np.tile(b,(1,visible.shape[1]))-visible, 2), axis=0)/2-np.sum(np.log(a+np.power(a,-1)), axis=0))#np.power(a,-1)
+
+    return  x
 
 def flip(visible):
     i=np.random.randint(0, visible.shape[0])
