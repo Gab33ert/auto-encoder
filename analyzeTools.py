@@ -51,8 +51,17 @@ def visualize_3d(P, W, in_index, t):
         index=[idx for idx, v in enumerate(x) if v]
     print(l)
 
+def visualize_abstract_3d(P, W, index_list, t):                                   #same as usual visualize function but using the abstract layer list
+    for i in range(t-1):
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.scatter(P[index_list[i+1]][:,0],P[index_list[i+1]][:,1], P[index_list[i+1]][:,2], color="green")
+        #ax.scatter(P[index_list[i]][:,0],P[index_list[i]][:,1], P[index_list[i]][:,2], color="red")
+        ax.scatter(P[:,0],P[:,1], P[:,2], s=0.5)
+        plt.show()
+
     
-def analyze_topology_back(Wt, depth):
+def analyze_topology_back(Wt, depth):                                           #Plot histogram of the number of neurons in layers number depth that has a given % of connection to the input rate.
     n=Wt[depth-1].shape[0]
     l=[]
     for j in range(n):
@@ -67,10 +76,16 @@ def analyze_topology_back(Wt, depth):
     #plt.ylim(bottom=0)
     plt.show()
 
-def connection_backward_rate(Wt):
+def connection_backward_rate(Wt):                                               #histogram of the number of neurons in a layer that has a given backward connection rate.
     for i in range(len(Wt)):
-        plt.hist(np.sum(Wt[i], axis=1)/Wt[i].shape[1],weights=np.ones(Wt[i].shape[0]) / Wt[i].shape[0])
-        plt.title("connection rate from layer "+str(i)+" to "+str(i+1))
+        plt.hist(np.sum(Wt[i], axis=1),weights=np.ones(Wt[i].shape[0]) / Wt[i].shape[0])#/Wt[i].shape[1]
+        plt.title("backward connection rate from layer "+str(i)+" to "+str(i+1))
+        plt.show()
+        
+def connection_forward_rate(Wt):                                               #histogram of the number of neurons in a layer that has a given forward connection rate.
+    for i in range(len(Wt)):
+        plt.hist(np.sum(Wt[i], axis=0),weights=np.ones(Wt[i].shape[1]) / Wt[i].shape[1])#/Wt[i].shape[0]
+        plt.title("forward connection rate from layer "+str(i)+" to "+str(i+1))
         plt.show()
     
 def analyze_topology(Wt, depth):
@@ -82,7 +97,7 @@ def analyze_topology(Wt, depth):
     print(100*np.sum(out)/out.shape[0])
     
 
-def analyze_topology_froward(Wt, depth):
+def analyze_topology_froward(Wt, depth):                                        #plot histogram of the number of neurons from the input that has a given connection rate to the layers number depth
     l=[]    
     n=Wt[0].shape[1]
     for j in range(n):
@@ -96,3 +111,9 @@ def analyze_topology_froward(Wt, depth):
     plt.title("forward depth "+str(depth))
     #plt.ylim(bottom=0)
     plt.show()
+
+def connection_forward_0(Wt):                                               #detect nerons with 0 output connections
+    l=[]
+    for i in range(len(Wt)):
+        l.append(np.mean(np.where(np.sum(Wt[i], axis=0)==0, 1, 0)))
+    print(l)

@@ -49,19 +49,39 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
     return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]
  
 def build_3d(n, d, sigma):                                                     #n is the depth, d and sigma are connection caracteristics
-    i=28#input image sze (MNIST is 28*28)
+    i=28#input image sze (MNIST is ims*ims)
     cells_pos=np.zeros((n*i*i,3))
     for z in range(n):
         for y in range(i):
             for x in range(i):
-                if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
-                    cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
-                    cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
-                    cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
-    cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
-    cells_pos[:,2]+=(1000/27)*np.random.random(cells_pos[:,2].shape)
-    return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(28*28)
-    
+                #if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
+                cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
+                cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
+                cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
+    #cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
+    cells_pos[:,2]+=(1000/(i-1))*np.random.random(cells_pos[:,2].shape)
+    cells_pos[0:783, 2]=(2500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
+    cells_pos[i*i-1 , 2]=cells_pos[i*i-2 , 2]
+    return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(i*i)
+"""
+def build_3d(n, d, sigma):                                                     #n is the depth, d and sigma are connection caracteristics
+    i=28#input image sze (MNIST is ims*ims)
+    cells_pos=np.zeros((n*i*i,3))
+    h=[28, 19, 15, 8, 6, 4]
+    for z in range(n):
+        j=h[z]#j=(28-6*z)
+        for y in range(j):
+            for x in range(j):
+                #if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
+                cells_pos[x+i*(y+i*z),0]=(x-0.5*(j-1))*1000/(i-1)+500
+                cells_pos[x+i*(y+i*z),1]=(y-0.5*(j-1))*1000/(i-1)+500
+                cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
+    #cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
+    cells_pos[:,2]+=(1000/(i-1))*np.random.random(cells_pos[:,2].shape)
+    #cells_pos[0:783, 2]=(500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
+    return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(i*i)
+"""  
+  
 
 
 def connect(P, n_input_cells, n_output_cells, d, sigma):                       #build graph
@@ -107,7 +127,7 @@ def connect_3d_sharp(P, d, sigma):
     # Shifted Distances 
     D = np.hypot(0.1*D, dP[...,2]+d)
     #W = np.zeros((n,n))
-    W=np.where((np.random.uniform(0,1,(n,n)) < np.exp((-np.power(np.maximum(0,D-4*sigma),2))/(2*(sigma/2)**2))), 1, 0)
+    W=np.where((D-sigma)<0, 1 , 0)#np.where((np.random.uniform(0,1,(n,n)) < np.exp((-np.power(np.maximum(0,D-4*sigma),2))/(2*(sigma/2)**2))), 1, 0)
     s=np.argwhere(W==1)
     for i in range(s.shape[0]):
         if(P[s[i,1],2]>=P[s[i,0],2]):
@@ -121,13 +141,64 @@ def abstract_layer(in_index, W, t):                                            #
     Wt=[]
     for i in range(t-1):
         x=np.zeros(W.shape[0])
-        for i in index:x[i]=1
+        for j in index:x[j]=1
         x=W.dot(x)
         x=(x > 0).astype(int)
         index_new=np.asarray([idx for idx, v in enumerate(x) if v])
         Wt.append(W[index_new[:, None], index])
         index=index_new
+        print(Wt[i].shape)
     return Wt
+
+def abstract_layer_local_backward_restriction(in_index, W, t, n_min):           #unfold the total connection matrix into layer by layer connection matrix
+    index=in_index                                                               #at each layers neurons are connected to at least n_min neurons
+    Wt=[]
+    index_list=[]
+    index_list.append(in_index)
+    for i in range(t-1):
+        print(i)
+        x=np.zeros(W.shape[0])
+        for j in index:x[j]=1
+        x=W.dot(x)
+        x=(x > 0).astype(int)
+        index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+        index_new=index_new[np.argwhere(np.sum(W[index_new[:, None], index], axis=1) >= n_min)]#/index.shape[0]
+        index_new=index_new.reshape((index_new.shape[0],))
+        Wt.append(W[index_new[:, None], index])
+        index_list.append(index_new)
+        index=index_new
+        print(Wt[i].shape)
+    return Wt, index_list
+
+def abstract_layer_local_forward_restriction(in_index, W, t, n_min):           #unfold the total connection matrix into layer by layer connection matrix
+   index=in_index                                                               #at each layers neurons are connected to at least n_min neurons
+   Wt=[]
+   x=np.zeros(W.shape[0])
+   for j in index:x[j]=1
+   x=W.dot(x)
+   x=(x > 0).astype(int)
+   index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+   index_new=index_new.reshape((index_new.shape[0],))
+   index_old=index
+   index=index_new
+   for i in range(1,t):
+       x=np.zeros(W.shape[0])
+       for j in index:x[j]=1
+       x=W.dot(x)
+       x=(x > 0).astype(int)
+       index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+       index=index[np.argwhere(np.sum(W[index_new,:][:, index], axis=0) >= n_min)]#/index.shape[0]
+       Wt.append(W[index.reshape((index.shape[0],)),:][:, index_old])
+       print(Wt[i-1].shape)
+       x=np.zeros(W.shape[0])
+       for j in index:x[j]=1
+       x=W.dot(x)
+       x=(x > 0).astype(int)
+       index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+       index_new=index_new.reshape((index_new.shape[0],))
+       index_old=index.reshape((index.shape[0],))
+       index=index_new
+   return Wt
 
 def abstract_layer_restriction(Wt, n, rate):                                           #choose n unit in final layer with high connection to input
     k=0
