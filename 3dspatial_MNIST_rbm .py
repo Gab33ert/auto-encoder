@@ -16,8 +16,7 @@ import analyzeTools as at
 import backprop
 import rbm_train as rbmt
 import rbm_visualize as rbmv
-
-
+from skimage.transform import resize
 
 def MNIST_red(x):
     ind=np.ones(14)
@@ -45,7 +44,7 @@ epsilon=0.001#rbm rate
 
 P, W,in_index =top.build_3d(7, d, sigma)
 #Wt=top.abstract_layer(in_index, W, t)#_local_backward_restriction
-Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t,20)
+Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t,16)
 at.visualize_abstract_3d(P, W, index_list, t)
 at.connection_forward_0(Wt)
 at.connection_backward_rate(Wt)
@@ -83,6 +82,7 @@ mnist = tf.keras.datasets.mnist                                                #
 x_train=x_train[0:dataset_size,:,:]
 x_test=x_test[0:dataset_size_t,:,:]
 
+#bt = np.transpose(resize(np.transpose(x_train), (14, 14), anti_aliasing=True))
 #x_train=MNIST_red(x_train)
 #x_test=MNIST_red(x_test)
 
@@ -97,11 +97,11 @@ x_test=np.transpose(scaler.transform(x_test))
 
 
 #at.visualize_3d(P, W, in_index, t)
-
+mode=[0,1]                                                                      #first digit 0/1 grbm/rbm, second digit 0 no sparsity p!=0 sparsity rate parameter
 answer = input("Do you want to keep going y/n?")
 if answer == "y":
 
-    mode=0#grbm mode
+    mode[0]=0#grbm mode
 
     b[0]=np.random.randn(Wt[0].shape[1],1)
     c[0]=np.zeros(c[0].shape)    
@@ -123,7 +123,7 @@ if answer == "y":
     rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
     rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
 
-    mode=1#rbm mode
+    mode[0]=1#rbm mode
     
     b[1]=np.zeros(b[1].shape)
     c[1]=np.zeros(c[1].shape)    
@@ -132,7 +132,7 @@ if answer == "y":
     
     #layer 2
     seconds = time.time()
-    iterr_rbm=2000
+    iterr_rbm=1000
     epsilon=0.05#rbm rate
     x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
     x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
@@ -148,7 +148,7 @@ if answer == "y":
     w[2]=w[2]*np.random.normal(0, 0.01, w[2].shape) 
     #layer 3
     seconds = time.time()
-    iterr_rbm=5000
+    iterr_rbm=1000
     epsilon=0.01#0.05#rbm rate
     x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
     x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
@@ -164,7 +164,7 @@ if answer == "y":
     w[3]=w[3]*np.random.normal(0, 0.01, w[3].shape) 
     #layer 4
     seconds = time.time()
-    iterr_rbm=5000
+    iterr_rbm=1000
     epsilon=0.1#rbm rate
     x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
     x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
@@ -179,6 +179,21 @@ if answer == "y":
         plt.hist(w[i][np.nonzero(w[i])], 100)
         plt.show()
 
+    x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
+    n=10
+    pi=0
+    p=50#x_test_4.shape[0]
+    x=np.zeros((10*n, p))
+    for j in range(10):                                                         #affiche l'encodage
+        q=0
+        i=0
+        while (q<n and i<300):
+            if y_test[i]==j:
+                x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
+                q+=1
+            i+=1
+    plt.imshow(np.transpose(x))
+        
     """
 
     b[0]=np.random.randn(Wt[0].shape[1],1)
@@ -282,7 +297,23 @@ if answer == "y":
                 q+=1
             i+=1
         print((10*x/n)//1)
-    
+
+    n=10
+    pi=0
+    p=50#x_test_4.shape[0]
+    x=np.zeros((10*n, p))
+    for j in range(10):                                                         #affiche l'encodage
+        q=0
+        i=0
+        while (q<n and i<300):
+            if y_test[i]==j:
+                x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
+                q+=1
+            i+=1
+    plt.imshow(np.transpose(x))
+        
+        
+
     
     for i in range(4):
         plt.hist(w[i])

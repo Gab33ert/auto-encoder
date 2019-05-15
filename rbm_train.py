@@ -35,14 +35,17 @@ def backandforw(hidden, b, c, w, k, mode):
 
 def spatial_actualise_weight(visible, b, c, w, k, epsilon, mode, Wt):
     hidden=sample_rbm_forward(visible, c, w)
-    hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode)
+    hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))*Wt
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
+    #if mode[1]!=0:
+    #    w+=-(1/visible.shape[1])*((2*mode[1]-1)-(1/visible.shape[1])*(2*sigmoid(c)-1))
+    #    c+=
 
 def actualise_weight(visible, b, c, w, k, epsilon, mode):
     hidden=sample_rbm_forward(visible, c, w)
-    hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode)
+    hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
@@ -71,7 +74,7 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, 
         actualise_weight(visible_batch, b, c, w, cd, epsilon, mode)
         if i%(iterr_rbm//20)==0:
             ind.append(i)
-            if mode==0:
+            if mode[0]==0:
                 tt=time.time()
                 e.append(rbmv.energy_grbm(x_test, b, c, w))
                 E.append(rbmv.energy_grbm(visible, b, c, w))
@@ -93,7 +96,7 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, 
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
-    if mode == 1:
+    if mode[0] == 1:
         plt.yscale('symlog')
     plt.show()
     plt.plot(ind, fe, label="free energy test set")
@@ -128,7 +131,7 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
         spatial_actualise_weight(visible_batch, b, c, w, 1, epsilon, mode, Wt)
         if i%(iterr_rbm//20)==0:
             ind.append(i)
-            if mode==0:
+            if mode[0]==0:
                 tt=time.time()
                 e.append(rbmv.energy_grbm(x_test, b, c, w))
                 E.append(rbmv.energy_grbm(visible, b, c, w))
@@ -152,7 +155,7 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
-    if mode == 1:
+    if mode[0] == 1:
         plt.yscale('symlog')
     plt.show()
     plt.plot(ind, fe, label="free energy test set")

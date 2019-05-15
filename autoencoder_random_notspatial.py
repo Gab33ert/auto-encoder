@@ -1,5 +1,5 @@
 # topographique auto encoder sturcture
-#same as autoencoder_not_spatial but ;ore neurone
+#build uniform position, split neurons into layers, connect layers to layers creating topology and then train backprop
 import os
 import tqdm
 import voronoi
@@ -14,31 +14,19 @@ import copy
 from sklearn import preprocessing
 
 def connect(Pl, l, n_input_cells, n_output_cells):
-    sigma=400
-    sigma_in=400
+    sigma=800
     W=[]
-    
-    #input connection
-    yin=np.zeros((n_input_cells,2))
-    yin[:,1]=np.linspace(0, 1000, n_input_cells)
-    P1=yin
-    P2=Pl[0]
-    n1 = len(P1)
-    n2 = len(P2)
-    
-    dP = P1.reshape(1,n1,2) - P2.reshape(n2,1,2)
-    
-    # Distances
-    #D = np.hypot(dP[...,0], dP[...,1])
-    D = dP[...,1]
-    win = np.zeros((n2,n1))
-    for i in range(n1):
-        for j in range(n2):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma_in**2))):
-                win[j,i]=1
+    q=1.3 #control the rate connection to first layer (has to be bigger than 1)
+    win=np.floor(np.random.uniform(0,q,(len(Pl[0]),n_input_cells)))#create input connection
+    for i in range(n_input_cells):#ensure each entry is connected to at least one neurone
+        counter=0
+        for j in range(len(Pl[0])):
+            if win[j,i]!=0:
+                counter+=1
+        if counter==0:
+            win[randint(0,len(Pl[0])-1),i]=1
     W.append(win)
-    
-    for j in range(l-1):#hidden connection
+    for j in range(l-1):
         P1=Pl[j]
         P2=Pl[j+1]
         n1 = len(P1)
@@ -59,8 +47,7 @@ def connect(Pl, l, n_input_cells, n_output_cells):
                     if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):
                         w[j,i]=1
         W.append(w)
-    #output connection
-    wout=np.floor(np.random.uniform(0,2,(n_output_cells,len(Pl[l-1]))))
+    wout=np.floor(np.random.uniform(0,3,(n_output_cells,len(Pl[l-1]))))
     W.append(wout)
     
     return W
@@ -81,6 +68,7 @@ def split(P, l):#l number of layer
                     c=0
         temp=np.array(temp)
         layer.append(temp)
+        print(temp.shape)
     return np.array(layer)
 
 
@@ -110,7 +98,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 	    density[:,i]=np.power(((3.6)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "autoencoder-second-degree-big.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
+    filename = "autoencoder-second-degree.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -154,19 +142,16 @@ def backprop(x_in, w, alpha): #propagate back, train W one step and resturn actu
     for i in range(l-1,-1,-1):
         e.append(dsigmoid(w[i].dot(X[i]))*np.transpose(w[i+1]).dot(e[l-1-i]))
     for i in range(l+1):
-        w[i]-=alpha*e[l-i].dot(np.transpose(X[i]))*W[i]
-    return w, (np.sum(np.abs((x_out-x_in))))/(x_in.shape[1]*x_in.shape[0])
+        for j in range(x_in.shape[1]):
+           w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
+    return w, (np.sum((x_out-x_in)**2))/(x_in.shape[1])
 
-def err(x_in,w):
-    X, x_out=forward(x_in,w)
-    return np.sum(np.abs((x_out-x_in)))/(x_in.shape[1]*x_in.shape[0])
     
-def train(x_in, w, iterr, alpha):
+def train(x_in, w, iterr, alpha,):
     error=np.zeros(iterr)
     for i in range(iterr):
-            alpha*=(10)**(1/(-iterr))
             w, error[i] = backprop(x_in, w, alpha)
-    plt.semilogy(error)
+    plt.loglog(error)
     return w, error[iterr-1]
 
 
@@ -181,7 +166,7 @@ def generate_poly(data_size, n, degree):
         return p
     for i in range(n):
         a=2*np.random.random([degree+1])-1
-        data[:,i]=poly(np.linspace(-1, 1, data_size), a)
+        data[:,i]=poly(np.linspace(-2, 2, data_size), a)
     return data
 
 
@@ -191,35 +176,36 @@ def generate_poly(data_size, n, degree):
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
 l=5    
-size=100
+size=10
 
-P, W = build(300, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=1)
+P, W = build(30, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=1)
 w=copy.deepcopy(W)
+w[0]=2*np.random.random((7,10))-1
 
-w[0]=(2*np.random.random(w[0].shape)-1)*w[0]
-for i in range(1,len(w)):
-    w[i]=(2*np.random.random(w[i].shape)-1)*w[i]
+
+w[1]=2*np.random.random((6,7))-1
+w[2]=2*np.random.random((4,6))-1
+w[3]=2*np.random.random((6,4))-1
+w[4]=2*np.random.random((7,6))-1
+w[5]=2*np.random.random((10,7))-1
+#x=np.random.random([size])
+#data=np.random.random([size, 1])
 
 scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 800, 20)
-data_t=generate_poly(size, 40, 20)
+data=generate_poly(10, 50, 4)
 scaled_data=scaler.fit_transform(data)
-scaled_data_t=scaler.fit_transform(data_t)
+unscaled_data=scaler.inverse_transform(scaled_data)
 
+#data=np.ones((10,2))
+#data[0,0]=0
+#data[1,0]=0
 
-a,b=train(scaled_data, w, 1000, 0.003)
+#data=np.random.random([size, 1000])
+a,b=train(scaled_data, w, 100000, 0.3)
+X, x=forward(scaled_data,w)
 
-X, x=forward(scaled_data_t[:,0:10],w)
-
-plt.show()
-for i in range(10):
-    plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
-    plt.plot(np.linspace(-1, 1, size),x[:,i])
-    plt.show()
-    
-print(np.max(scaled_data_t[:,0:10]-x))
-print(b)
-print("test", err(scaled_data_t,w))
+plt.plot(x[:,0:4]) 
+plt.plot(scaled_data[:,0:4])
 #for i in range(6):
 #    print(w[i]-W[i])
 #print(w)

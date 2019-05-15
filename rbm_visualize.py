@@ -57,7 +57,7 @@ def pseudo_likelihood_grbm(visible, b, c, w, n):
 
 
 def gibbs_sampling(visible, b, c, w, n, scaler, mode):
-    if mode==0:
+    if mode[0]==0:
         plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
         plt.show()

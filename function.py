@@ -7,7 +7,7 @@ Created on Thu Apr 25 17:19:25 2019
 @author: gouraud
 """
 def sigmoid(x):
-    return (2/(1+np.exp(-x)))-1
+    return 1/(1+np.exp(-2*x))#(2/(1+np.exp(-x)))-1
 
 def dsigmoid(x):
     f=sigmoid(x)
