@@ -33,25 +33,34 @@ def backandforw(hidden, b, c, w, k, mode):
         hidden=sample_rbm_forward(visible_k, c, w)
     return hidden, visible_k
 
-def spatial_actualise_weight(visible, b, c, w, k, epsilon, mode, Wt):
+def spatial_actualise_weight(visible, b, c, w, k, epsilon, alpha, mode, Wt):
     hidden=sample_rbm_forward(visible, c, w)
     hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))*Wt
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
-    #if mode[1]!=0:
-    #    w+=-(1/visible.shape[1])*((2*mode[1]-1)-(1/visible.shape[1])*(2*sigmoid(c)-1))
-    #    c+=
+    if mode[1]!=0:
+        cwv=c+w.dot(visible)
+        dsigm=func.dsigmoid(cwv)
+        q=((2*mode[1]-1)-(1/visible.shape[1])*(2*np.sum(func.sigmoid(cwv), axis=1)-1)).reshape(w.shape[0],1)
+        q=q*np.abs(np.power(q,2))
+        w+=epsilon*alpha*q*(1/visible.shape[1])*(dsigm.dot(np.transpose(visible)))*Wt
+        c+=epsilon*alpha*q*(1/visible.shape[1])*(np.sum(dsigm, axis=1).reshape(w.shape[0],1))
 
-def actualise_weight(visible, b, c, w, k, epsilon, mode):
+def actualise_weight(visible, b, c, w, k, epsilon, alpha, mode):
     hidden=sample_rbm_forward(visible, c, w)
     hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
-
+    if mode[1]!=0:
+        cwv=c+w.dot(visible)
+        dsigm=func.dsigmoid(cwv)
+        q=((2*mode[1]-1)-(2*np.mean(func.sigmoid(cwv), axis=1)-1)).reshape(w.shape[0],1)
+        w+=epsilon*alpha*q*(1/visible.shape[1])*(dsigm.dot(np.transpose(visible)))
+        c+=epsilon*alpha*q*(1/visible.shape[1])*(np.sum(dsigm, axis=1).reshape(w.shape[0],1))
   
-def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, cd, f):
+def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, alpha, x_test, dataset_size, cd, f):
     ind=[]
     e=[]
     E=[]
@@ -71,7 +80,7 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, 
             g=0
         if d>dataset_size-34:
             d=0
-        actualise_weight(visible_batch, b, c, w, cd, epsilon, mode)
+        actualise_weight(visible_batch, b, c, w, cd, epsilon, alpha, mode)
         if i%(iterr_rbm//20)==0:
             ind.append(i)
             if mode[0]==0:
@@ -91,8 +100,9 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, 
                 tt=time.time()
                 fe.append(rbmv.pseudo_likelihood_rbm(x_test, b, c, w, f))
                 #fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
-                t2+=time.time()-tt
-
+                t2+=time.time()-tt   
+    plt.hist(np.mean(func.sigmoid(c+w.dot(visible)), axis=1))
+    plt.show() 
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
@@ -105,9 +115,10 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, 
     plt.show()
     print("free-energy", fe[len(fe)-1])
     print("energy time and pseudo likelihood time ", t1, t2)
+    return [ind,fe]
 
     
-def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, dataset_size, cd, f, Wt):
+def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, alpha, x_test, dataset_size, cd, f, Wt):
     ind=[]
     e=[]
     E=[]
@@ -128,7 +139,7 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
             g=0
         if d>dataset_size-34:
             d=0
-        spatial_actualise_weight(visible_batch, b, c, w, 1, epsilon, mode, Wt)
+        spatial_actualise_weight(visible_batch, b, c, w, cd, epsilon, alpha, mode, Wt)
         if i%(iterr_rbm//20)==0:
             ind.append(i)
             if mode[0]==0:
@@ -151,7 +162,8 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
                 #fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
                 er.append(rbmv.error(x_test, b, c, w))
                 t2+=time.time()-tt
-
+    plt.hist(np.mean(func.sigmoid(c+w.dot(visible)), axis=1), bins=30)
+    plt.show()
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")
     plt.legend(loc='upper right')
@@ -166,6 +178,7 @@ def train_spatial_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, x_test, datase
     print("energy time and pseudo likelihood time ", t1, t2)
     plt.plot(ind, er)
     plt.show()
+    return [ind,fe]
 
 
 

@@ -9,6 +9,7 @@ from sklearn import preprocessing
 np.set_printoptions(threshold=np.inf)
 import tensorflow as tf
 import time
+import pickle
 
 import topology as top
 import function as func
@@ -25,6 +26,27 @@ def MNIST_red(x):
     ind=ind.astype(int)
     return x[:,ind, :][:,:, ind]
     
+class store(object): 
+    def __init__(self, build_height=0, build_d=0, build_sigma=0, W=0, Wt=0, P=0, index_list=0, Spatial=0, epsilon=0, alpha=0, mode=0, iterr_rbm=0, w=0, b=0, c=0, fe=0):
+        self.build_height = build_height#build length
+        self.build_d = build_d#connection length
+        self.build_sigma = build_sigma#connection width
+        self.W = W#complete connection matrix
+        self.Wt = Wt#layered connection matrix
+        self.P = P#position array
+        self.index_list = index_list#list of index of layers suposed to be 5
+        
+        self.Spatial = Spatial#==True if spatial connection
+        self.epsilon = epsilon#list of all learning rate (supposed to be 4)
+        self.alpha = alpha#list of sparsity learning rate
+        self.mode = mode#list of list(first element 0/1->gaussianRbm/rbm, second element, if mode[i][1]==0 no sparsity, otherwise mode[i][1] is the target sparsity)
+        self.iterr_rbm = iterr_rbm#list of iterration for rbm training
+        
+        self.w = w#learned weight
+        self.b = b#learned backward bias
+        self.c = c#learned forward bias
+        
+        self.fe = fe#training free energy
 
  
 
@@ -38,17 +60,19 @@ sigma=16#4
 ims=28
 d=27#260
 alpha=0.0005#backprop rate
+height=7
+epsilon=[0]*4#rbm rate
+fe=[]
+Spatial=True
 
-epsilon=0.001#rbm rate
-
-
-P, W,in_index =top.build_3d(7, d, sigma)
+P, W,in_index =top.build_3d(height, d, sigma)
 #Wt=top.abstract_layer(in_index, W, t)#_local_backward_restriction
-Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t,16)
+Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t, 16)
 at.visualize_abstract_3d(P, W, index_list, t)
-at.connection_forward_0(Wt)
-at.connection_backward_rate(Wt)
-at.connection_forward_rate(Wt)
+at.degree_distribution(Wt)
+#at.connection_forward_0(Wt)
+#at.connection_backward_rate(Wt)
+#at.connection_forward_rate(Wt)
 #at.analyze_topology_back(Wt,4)
 #Wt=top.abstract_layer_restriction(Wt, 10, 0.93)
 #at.connection_backward_rate(Wt)
@@ -57,8 +81,8 @@ at.connection_forward_rate(Wt)
     #at.analyze_topology(Wt, i)
 #for i in range(t-1,0,-1):
     #at.analyze_topology_froward(Wt,i)
-for i in range(t-1,0,-1):
-    at.analyze_topology_back(Wt,i)
+#for i in range(t-1,0,-1):
+#    at.analyze_topology_back(Wt,i)
 #at.connection_backward_rate(Wt)
     
 w=[]                                                                           #initialise weight and bias
@@ -92,16 +116,341 @@ scaler = preprocessing.StandardScaler().fit(x_train)
 x_train = np.transpose(scaler.transform(x_train))
 x_test=np.transpose(scaler.transform(x_test))
 
-#x_train=2*(x_train > 0).astype(np.int)-1
-#x_test=2*(x_test > 0).astype(np.int)-1
-
 
 #at.visualize_3d(P, W, in_index, t)
-mode=[0,1]                                                                      #first digit 0/1 grbm/rbm, second digit 0 no sparsity p!=0 sparsity rate parameter
-answer = input("Do you want to keep going y/n?")
+answer = input("Do you want to train y/n?")
 if answer == "y":
+    if Spatial:
+        epsilon=[0.01, 0.05, 0.01, 0.07]
+        alpha=[0.5, 0.1, 0.1, 0.05]
+        mode=[[0, 0], [1, 0.5], [1, 0.3], [1, 0.1]]
+        iterr_rbm=[3000, 1000, 3000, 1000]
+            
+        b[0]=np.random.randn(Wt[0].shape[1],1)
+        c[0]=np.zeros(c[0].shape)    
+        w[0]=copy.deepcopy(Wt[0])
+        w[0]=w[0]*np.random.normal(0, 0.01, w[0].shape)
 
+        #layer 1
+        seconds = time.time()
+        fe.append(rbmt.train_spatial_rbm(x_train, b[0], c[0], w[0], iterr_rbm[0], mode[0], epsilon[0], alpha[0], x_test, dataset_size, 1, 50, Wt[0]))
+        for i in range(0,w[0].shape[0]-1,w[0].shape[0]//5):
+            plt.imshow(w[0][i,:].reshape(ims,ims))
+            plt.colorbar()
+            plt.show()
+        print("error", rbmv.error(x_test,b[0],c[0],w[0]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode[0])
+        rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode[0])
+        rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode[0])
+    
+        x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        n=20
+        pi=0
+        p=200#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_1[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+    
+        
+        b[1]=np.zeros(b[1].shape)
+        c[1]=np.zeros(c[1].shape)    
+        w[1]=copy.deepcopy(Wt[1])
+        w[1]=w[1]*np.random.normal(0, 0.01, w[1].shape)
+        
+        #layer 2
+        seconds = time.time()
+        x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
+        x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        fe.append(rbmt.train_spatial_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm[1], mode[1], epsilon[1], alpha[1], x_test_1, dataset_size, 1, 50, Wt[1]))
+        print("layer 2")
+        print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 1, scaler)
+    
+        x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        n=20
+        pi=0
+        p=200#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_2[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+    
+
+
+        b[2]=np.zeros(b[2].shape)
+        c[2]=np.zeros(c[2].shape)
+        w[2]=copy.deepcopy(Wt[2])
+        w[2]=w[2]*np.random.normal(0, 0.01, w[2].shape) 
+        #layer 3
+        seconds = time.time()
+        x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
+        x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        fe.append(rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm[2], mode[2], epsilon[2], alpha[2], x_test_2, dataset_size, 1, 50, Wt[2]))
+        print("layer 3")
+        print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
+    
+        x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        n=20
+        pi=0
+        p=200#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_3[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+    
+    
+        b[3]=np.zeros(b[3].shape)
+        c[3]=np.zeros(c[3].shape)
+        w[3]=copy.deepcopy(Wt[3])
+        w[3]=w[3]*np.random.normal(0, 0.01, w[3].shape) 
+        #layer 4
+        seconds = time.time()
+
+        x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
+        x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        fe.append(rbmt.train_spatial_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm[3], mode[3], epsilon[3], alpha[3], x_test_3, dataset_size, 1, 50, Wt[3]))
+        print("layer 4")
+        print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
+        
+        
+        for i in range(4):
+            plt.hist(w[i][np.nonzero(w[i])], 100)
+            plt.show()
+    
+        x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
+        n=20
+        pi=0
+        p=200#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+
+    
+    else:
+        epsilon=[0.0002, 0.004, 0.005, 0.1]
+        alpha=[8, 8, 8, 8]
+        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.1]]
+        iterr_rbm=[5000, 2000, 2000, 10000]
+        
+        b[0]=np.random.randn(Wt[0].shape[1],1)
+        c[0]=np.zeros(c[0].shape)
+        w[0]=np.ones(w[0].shape)*np.random.normal(0, 0.01, w[0].shape)
+        
+        seconds = time.time()
+        fe.append(rbmt.train_rbm(x_train, b[0], c[0], w[0], iterr_rbm[0], mode[0], epsilon[0], alpha[0], x_test, dataset_size, 1, 50))
+        for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
+            plt.imshow(w[0][i,:].reshape(ims,ims))
+            plt.colorbar()
+            plt.show()
+        print("error", rbmv.error(x_test,b[0],c[0],w[0]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode[0])
+        rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode[0])
+        rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode[0])
+     
+        
+
+    
+        #layer 2
+    
+        b[1]=np.zeros(b[1].shape)
+        c[1]=np.zeros(c[1].shape)
+        w[1]=np.ones(w[1].shape)*np.random.normal(0, 0.01, w[1].shape)
+    
+        seconds = time.time()
+        x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
+        x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        fe.append(rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm[1], mode[1], epsilon[1], alpha[1], x_test_1, dataset_size, 1, 50))
+        print("time",time.time()-seconds)
+    
+     
+        print("layer 2")
+        print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
+    
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 1, scaler)
+    
+        b[2]=np.zeros(b[2].shape)
+        c[2]=np.zeros(c[2].shape)
+        w[2]=np.ones(w[2].shape)*np.random.normal(0, 0.01, w[2].shape)
+    
+     
+        #layer 3
+        seconds = time.time()
+        x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
+        x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        fe.append(rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm[2], mode[2], epsilon[2], alpha[2], x_test_2, dataset_size, 1, 200))
+
+        print("layer 3")
+        print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
+    
+        #layer 4
+        
+        b[3]=np.zeros(b[3].shape)
+        c[3]=np.zeros(c[3].shape)
+        w[3]=np.ones(w[3].shape)*np.random.normal(0, 0.01, w[3].shape)
+    
+        
+        seconds = time.time()
+        x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
+        x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        fe.append(rbmt.train_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm[3], mode[3], epsilon[3], alpha[3], x_test_3, dataset_size, 1, 200))
+        print("layer 4")
+        print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
+        
+        x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
+        n=10
+        pi=0
+        p=50#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+            
+            
+    
+        
+        for i in range(4):
+            plt.hist(w[i])
+            plt.show()
+            
+        """  
+        #one layer sparse encoding
+        b[0]=np.random.randn(Wt[0].shape[1],1)
+        c[0]=np.zeros(c[0].shape)
+        w[0]=np.ones(w[0].shape)*np.random.normal(0, 0.01, w[0].shape)
+        
+        alpha=8
+        mode[1]=0.1
+        mode[0]=0
+        seconds = time.time()
+        iterr_rbm=5000
+        epsilon=0.002#rbm rate
+        rbmt.train_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, alpha, x_test, dataset_size, 1, 50)
+        for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
+            plt.imshow(w[0][i,:].reshape(ims,ims))
+            plt.colorbar()
+            plt.show()
+        print("error", rbmv.error(x_test,b[0],c[0],w[0]))
+        print("time",time.time()-seconds)
+        rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
+        rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
+        rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
+        
+        x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        n=20
+        pi=0
+        p=100#x_test_4.shape[0]
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_1[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        """
+        
+    answer = input("Do you want to save it y/n?")
+    if answer == "y":
+        memory = store(height, d, sigma, W, Wt, P, index_list, Spatial, epsilon, alpha, mode, iterr_rbm, w, b, c, fe)
+        with open('sparse_spatial_dbn.pkl', 'wb') as output:
+            pickle.dump(memory, output, pickle.HIGHEST_PROTOCOL)
+    elif answer == "n":
+        print("ok")
+    else:
+        print("Please enter y or n.")
+    
+    
+elif answer == "n":
+    print("ok")
+else:
+    print("Please enter y or n.")
+    
+    
+
+answer = input("Do you want to load y/n?")
+if answer == "y":
+    with open('sparse_spatial_dbn.pkl', 'rb') as data:
+        memory = pickle.load(data)
+        w=memory.w 
+        b=memory.b 
+        c=memory.c 
+        
+    
+    
+    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
+    rbmv.gibbs_deep_sampling(x_test[:,2:3], b, c, w, 3, scaler)
+    rbmv.gibbs_deep_sampling(x_test[:,3:4], b, c, w, 3, scaler)
+    
+    for i in range(4):
+        plt.plot(memory.fe[i][0], memory.fe[i][1], label="layer "+str(i+1))
+    plt.legend()
+    plt.show()
+elif answer == "n":
+    print("ok")
+else:
+    print("Please enter y or n.")
+    
+    
+    
+"""#works without sparsity but spatial
     mode[0]=0#grbm mode
+    alpha=0.5
 
     b[0]=np.random.randn(Wt[0].shape[1],1)
     c[0]=np.zeros(c[0].shape)    
@@ -112,7 +461,7 @@ if answer == "y":
     seconds = time.time()
     iterr_rbm=3000
     epsilon=0.01#rbm rate
-    rbmt.train_spatial_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, x_test, dataset_size, 1, 50, Wt[0])
+    rbmt.train_spatial_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, alpha, x_test, dataset_size, 1, 50, Wt[0])
     for i in range(0,w[0].shape[0]-1,w[0].shape[0]//5):
         plt.imshow(w[0][i,:].reshape(ims,ims))
         plt.colorbar()
@@ -123,6 +472,23 @@ if answer == "y":
     rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
     rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
 
+    x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+    n=20
+    pi=0
+    p=200#x_test_4.shape[0]
+    x=np.zeros((10*n, p))
+    for j in range(10):                                                         #affiche l'encodage
+        q=0
+        i=0
+        while (q<n and i<300):
+            if y_test[i]==j:
+                x[q+n*j, 0:p]=0.5*(x_test_1[pi:pi+p, i]+1)
+                q+=1
+            i+=1
+    fig, ax = plt.subplots(figsize=(90, 10))
+    ax.imshow(x)
+
+
     mode[0]=1#rbm mode
     
     b[1]=np.zeros(b[1].shape)
@@ -132,11 +498,11 @@ if answer == "y":
     
     #layer 2
     seconds = time.time()
-    iterr_rbm=1000
+    iterr_rbm=500#2000
     epsilon=0.05#rbm rate
     x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
     x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
-    rbmt.train_spatial_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test_1, dataset_size, 1, 50, Wt[1])
+    rbmt.train_spatial_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, alpha, x_test_1, dataset_size, 1, 50, Wt[1])
     print("layer 2")
     print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
     print("time",time.time()-seconds)
@@ -148,11 +514,11 @@ if answer == "y":
     w[2]=w[2]*np.random.normal(0, 0.01, w[2].shape) 
     #layer 3
     seconds = time.time()
-    iterr_rbm=1000
+    iterr_rbm=3000#5000
     epsilon=0.01#0.05#rbm rate
     x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
     x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
-    rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test_2, dataset_size, 1, 50, Wt[2])
+    rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, alpha, x_test_2, dataset_size, 1, 50, Wt[2])
     print("layer 3")
     print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
     print("time",time.time()-seconds)
@@ -164,11 +530,11 @@ if answer == "y":
     w[3]=w[3]*np.random.normal(0, 0.01, w[3].shape) 
     #layer 4
     seconds = time.time()
-    iterr_rbm=1000
+    iterr_rbm=1000#5000
     epsilon=0.1#rbm rate
     x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
     x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
-    rbmt.train_spatial_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm, mode, epsilon, x_test_3, dataset_size, 1, 50, Wt[3])
+    rbmt.train_spatial_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm, mode, epsilon, alpha, x_test_3, dataset_size, 1, 50, Wt[3])
     print("layer 4")
     print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
     print("time",time.time()-seconds)
@@ -180,9 +546,9 @@ if answer == "y":
         plt.show()
 
     x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
-    n=10
+    n=20
     pi=0
-    p=50#x_test_4.shape[0]
+    p=200#x_test_4.shape[0]
     x=np.zeros((10*n, p))
     for j in range(10):                                                         #affiche l'encodage
         q=0
@@ -192,328 +558,8 @@ if answer == "y":
                 x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
                 q+=1
             i+=1
-    plt.imshow(np.transpose(x))
+    fig, ax = plt.subplots(figsize=(90, 10))
+    ax.imshow(x)
         
-    """
-
-    b[0]=np.random.randn(Wt[0].shape[1],1)
-    c[0]=np.zeros(c[0].shape)
-    w[0]=np.ones(w[0].shape)*np.random.normal(0, 0.01, w[0].shape)
-    
-    mode=0
-    seconds = time.time()
-    iterr_rbm=5000
-    epsilon=0.0002#rbm rate
-    rbmt.train_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, x_test, dataset_size, 1, 50)
-    for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
-        plt.imshow(w[0][i,:].reshape(ims,ims))
-        plt.colorbar()
-        plt.show()
-    print("error", rbmv.error(x_test,b[0],c[0],w[0]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
-
-    mode=1#rbm mode
-
-    #layer 2
-
-    b[1]=np.zeros(b[1].shape)
-    c[1]=np.zeros(c[1].shape)
-    w[1]=np.ones(w[1].shape)*np.random.normal(0, 0.01, w[1].shape)
-
-    seconds = time.time()
-    x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
-    x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
-    iterr_rbm=2000#15000
-    epsilon=0.004#0.02#rbm rate
-    rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test_1, dataset_size, 1, 50)
-    print("time",time.time()-seconds)
-
-    #iterr_rbm=3000
-    #epsilon=0.002
-    #rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test, dataset_size, 10, 200)
-    #print("time",time.time()-seconds)
-    #iterr_rbm=18000
-    #epsilon=0.0001
-    #rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test, dataset_size, 50, 400)
- 
-    print("layer 2")
-    print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
-
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 1, scaler)
-
-    b[2]=np.zeros(b[2].shape)
-    c[2]=np.zeros(c[2].shape)
-    w[2]=np.ones(w[2].shape)*np.random.normal(0, 0.01, w[2].shape)
-
- 
-    #layer 3
-    seconds = time.time()
-    x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
-    x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
-    iterr_rbm=2000
-    epsilon=0.005#rbm rate       #test it with 0.05
-    rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test_2, dataset_size, 1, 200)
-
-    #iterr_rbm=100000
-    #epsilon=0.00005#rbm rate
-    #rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test, dataset_size, 10, 200)
-
-    print("layer 3")
-    print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
-
-    #layer 4
-    
-    b[3]=np.zeros(b[3].shape)
-    c[3]=np.zeros(c[3].shape)
-    w[3]=np.ones(w[3].shape)*np.random.normal(0, 0.01, w[3].shape)
-
-    
-    seconds = time.time()
-    iterr_rbm=10000
-    epsilon=0.1#rbm rate
-    x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
-    x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
-    rbmt.train_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm, mode, epsilon, x_test_3, dataset_size, 1, 200)
-    print("layer 4")
-    print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
-    
-    x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
-    for j in range(10):
-        n=30
-        q=0
-        i=0
-        print(str(j))
-        x=np.zeros(x_test_4.shape[0])
-        while (q<n and i<300):
-            if y_test[i]==j:
-                x+=0.5*(x_test_4[:,i]+1)
-                q+=1
-            i+=1
-        print((10*x/n)//1)
-
-    n=10
-    pi=0
-    p=50#x_test_4.shape[0]
-    x=np.zeros((10*n, p))
-    for j in range(10):                                                         #affiche l'encodage
-        q=0
-        i=0
-        while (q<n and i<300):
-            if y_test[i]==j:
-                x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
-                q+=1
-            i+=1
-    plt.imshow(np.transpose(x))
-        
-        
-
-    
-    for i in range(4):
-        plt.hist(w[i])
-        plt.show()
-    """
-elif answer == "n":
-    print("ok")
-else:
-    print("Please enter y or n.")
-
-
-"""
-with parameter sigma=4,d=27,  restriction=32/33
-0.1*D
-and size 28*28
-
-    mode=0#grbm mode
-
-    b[0]=np.random.randn(Wt[0].shape[1],1)
-    c[0]=np.zeros(c[0].shape)    
-    w[0]=copy.deepcopy(Wt[0])
-    w[0]=w[0]*np.random.normal(0, 0.01, w[0].shape)
-
-    #layer 1
-    seconds = time.time()
-    iterr_rbm=3000
-    epsilon=0.001#rbm rate
-    rbmt.train_spatial_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, x_test, dataset_size, 1, 50, Wt[0])
-    for i in range(0,w[0].shape[0]-1,w[0].shape[0]//5):
-        plt.imshow(w[0][i,:].reshape(28,28))
-        plt.colorbar()
-        plt.show()
-    print("error", rbmv.error(x_test,b[0],c[0],w[0]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
-
-    mode=1#rbm mode
-    
-    b[1]=np.zeros(b[1].shape)
-    c[1]=np.zeros(c[1].shape)    
-    w[1]=copy.deepcopy(Wt[1])
-    w[1]=w[1]*np.random.normal(0, 0.01, w[1].shape)
-    
-    #layer 2
-    seconds = time.time()
-    iterr_rbm=200
-    epsilon=0.5#rbm rate
-    x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
-    x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
-    rbmt.train_spatial_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test_1, dataset_size, 1, 50, Wt[1])
-    print("layer 2")
-    print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 1, scaler)
-
-    b[2]=np.zeros(b[2].shape)
-    c[2]=np.zeros(c[2].shape)
-    w[2]=copy.deepcopy(Wt[2])
-    w[2]=w[2]*np.random.normal(0, 0.01, w[2].shape) 
-    #layer 3
-    seconds = time.time()
-    iterr_rbm=1000
-    epsilon=0.3#0.05#rbm rate
-    x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
-    x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
-    rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test_2, dataset_size, 1, 50, Wt[2])
-    print("layer 3")
-    print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
-
-    b[3]=np.zeros(b[3].shape)
-    c[3]=np.zeros(c[3].shape)
-    w[3]=copy.deepcopy(Wt[3])
-    w[3]=w[3]*np.random.normal(0, 0.01, w[3].shape) 
-    #layer 4
-    seconds = time.time()
-    iterr_rbm=5000
-    epsilon=0.001#rbm rate
-    x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
-    x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
-    rbmt.train_spatial_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm, mode, epsilon, x_test_3, dataset_size, 1, 50, Wt[3])
-    print("layer 4")
-    print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
-    
-    
-    
-    
-    
-
-
-    b[0]=np.random.randn(Wt[0].shape[1],1)
-    c[0]=np.zeros(c[0].shape)
-    w[0]=np.ones(w[0].shape)*np.random.normal(0, 0.01, w[0].shape)
-    
-    mode=0
-    seconds = time.time()
-    iterr_rbm=5000
-    epsilon=0.0002#rbm rate
-    rbmt.train_rbm(x_train, b[0], c[0], w[0], iterr_rbm, mode, epsilon, x_test, dataset_size, 1, 50)
-    for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
-        plt.imshow(w[0][i,:].reshape(28,28))
-        plt.colorbar()
-        plt.show()
-    print("error", rbmv.error(x_test,b[0],c[0],w[0]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode)
-    rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode)
-
-    mode=1#rbm mode
-
-    #layer 2
-
-    b[1]=np.zeros(b[1].shape)
-    c[1]=np.zeros(c[1].shape)
-    w[1]=np.ones(w[1].shape)*np.random.normal(0, 0.01, w[1].shape)
-
-    seconds = time.time()
-    x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
-    x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
-    iterr_rbm=2000#15000
-    epsilon=0.004#0.02#rbm rate
-    rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test_1, dataset_size, 1, 50)
-    print("time",time.time()-seconds)
-
-    #iterr_rbm=3000
-    #epsilon=0.002
-    #rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test, dataset_size, 10, 200)
-    #print("time",time.time()-seconds)
-    #iterr_rbm=18000
-    #epsilon=0.0001
-    #rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm, mode, epsilon, x_test, dataset_size, 50, 400)
- 
-    print("layer 2")
-    print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
-
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 1, scaler)
-
-    b[2]=np.zeros(b[2].shape)
-    c[2]=np.zeros(c[2].shape)
-    w[2]=np.ones(w[2].shape)*np.random.normal(0, 0.01, w[2].shape)
-
- 
-    #layer 3
-    seconds = time.time()
-    x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
-    x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
-    iterr_rbm=2000
-    epsilon=0.005#rbm rate       #test it with 0.05
-    rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test_2, dataset_size, 1, 200)
-
-    #iterr_rbm=100000
-    #epsilon=0.00005#rbm rate
-    #rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm, mode, epsilon, x_test, dataset_size, 10, 200)
-
-    print("layer 3")
-    print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
-
-    #layer 4
-    
-    b[3]=np.zeros(b[3].shape)
-    c[3]=np.zeros(c[3].shape)
-    w[3]=np.ones(w[3].shape)*np.random.normal(0, 0.01, w[3].shape)
-
-    
-    seconds = time.time()
-    iterr_rbm=10000
-    epsilon=0.1#rbm rate
-    x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
-    x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
-    rbmt.train_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm, mode, epsilon, x_test_3, dataset_size, 1, 200)
-    print("layer 4")
-    print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
-    print("time",time.time()-seconds)
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
-    
-    x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
-    for j in range(10):
-        n=30
-        q=0
-        i=0
-        print(str(j))
-        x=np.zeros(x_test_4.shape[0])
-        while (q<n and i<300):
-            if y_test[i]==j:
-                x+=0.5*(x_test_4[:,i]+1)
-                q+=1
-            i+=1
-        print((10*x/n)//1)
-    
-    
-    for i in range(4):
-        plt.hist(w[i])
-        plt.show()
     
 """

@@ -117,3 +117,8 @@ def connection_forward_0(Wt):                                               #det
     for i in range(len(Wt)):
         l.append(np.mean(np.where(np.sum(Wt[i], axis=0)==0, 1, 0)))
     print(l)
+    
+def degree_distribution(Wt):                                                     #plot histogram of the distribution of number of connection per neurone in each rbm
+    for i in range(len(Wt)):
+        plt.hist(np.append(np.sum(Wt[i], axis=1), np.sum(Wt[i], axis=0)))
+        plt.show()

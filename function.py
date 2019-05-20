@@ -11,5 +11,5 @@ def sigmoid(x):
 
 def dsigmoid(x):
     f=sigmoid(x)
-    return -(f+1)*(f-1)/2
+    return 2*f*(1-f)#-(f+1)*(f-1)/2
 

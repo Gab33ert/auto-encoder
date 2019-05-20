@@ -96,8 +96,8 @@ def gibbs_deep_sampling(visible, b, c, w, n, scaler):
     plt.show()
       
 def fake_data(b, c, w, n):
-    hidden=np.random.randint(2, size=c[n].shape)
-    hidden, visible=rbmt.backandforw(hidden, b[n], c[n], w[n], 50)
+    hidden=np.floor(1.1*np.random.random(size=c[n].shape))
+    hidden, visible=rbmt.backandforw(hidden, b[n], c[n], w[n], 50, 1)
     N=n
     while N >1:
         visible=rbmt.sample_rbm_backward(visible, b[N-1], w[N-1])
