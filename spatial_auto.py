@@ -17,7 +17,7 @@ def connect(P, n_input_cells, n_output_cells, d, sigma):
     n = len(P)
     dP = P.reshape(1,n,2) - P.reshape(n,1,2)
     # Shifted Distances 
-    D = np.hypot(dP[...,0]+d, dP[...,1])
+    D = np.hypot(dP[...,0]+d, 0.05*dP[...,1])
     W = np.zeros((n,n))
     for i in range(n):
         for j in range(n):
@@ -63,12 +63,14 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
 
     cells_pos = np.load(filename)
     cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
-    cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
+    #cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
+    in_index=cells_in[:,0]
+    in_index=in_index[np.argsort(P[in_index][:,1])]
     
     W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma)
+    out_index=visualize(W, cells_pos, cells_in[:,0], t)
 
-
-    return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]#, W_in, W_out, bias
+    return cells_pos/1000, W, in_index, out_index#cells_out[:,0]#, W_in, W_out, bias
     
 
 
@@ -86,8 +88,17 @@ def forward(x, w, t):
         x=sigmoid(w.dot(x))
     return X, x
 
-def backward(x_in, w, t, in_index, out_index, alpha):
+def backward(x_in, w, t, in_index, out_index, alpha):#for i in range(7):print(np.mean(np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]))
     X, x_out=forward(x_in, w, t)
+    ro=[]
+    idxx=[]
+    for i in X:
+        ii=np.mean(i, axis=1)
+        idx=np.argwhere(ii!=0)
+        idxx.append(idx)
+        ro.append(ii[idx])
+    
+    beta=[0, 0, 0, 1, 0, 0]
     x_in_reshape=np.zeros(x_in.shape)
     x_in_reshape[out_index]=x_in[in_index]
 
@@ -98,9 +109,10 @@ def backward(x_in, w, t, in_index, out_index, alpha):
 
     e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
     for i in range(t-2,-1,-1):
-        e.append(dsigmoid(w.dot(X[i]))*np.transpose(w).dot(e[t-2-i]))
+        b=beta[i]*sigmoid(w.dot(X[i]))
+        e.append(dsigmoid(w.dot(X[i]))*(np.transpose(w).dot(e[t-2-i])+b))#+np.transpose(b))
     for i in range(t):
-        w-=alpha*e[t-1-i].dot(np.transpose(X[i]))*W
+        w-=alpha*(e[t-1-i]).dot(np.transpose(X[i]))*W
     return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
 
 def err(x_in, w, t):
@@ -138,20 +150,40 @@ def train(x_in, w, t, in_index, out_index, iterr, alpha):
     plt.semilogy(error)
     return w, error[iterr-1]
 
-def visualize(in_index, t):
+def visualize(W, P, in_index, t):
     index=in_index
-    for i in range(t):
-        print(t)
-        plt.scatter(P[index][:,0],P[index][:,1])
-        axes = plt.gca()
-        axes.set_xlim([0,1])
-        plt.show()
+    plt.scatter(P[index][:,0],P[index][:,1])
+    axes = plt.gca()
+    axes.set_xlim([0,1000])
+    plt.show()
+    for i in range(t-1):
         x=np.zeros(W.shape[0])
-        for i in index:x[i]=1
+        for j in index:x[j]=1
+        print(np.sum(x))
         x=W.dot(x)
         x=(x > 0).astype(int)
         index=[idx for idx, v in enumerate(x) if v]
+        plt.scatter(P[index][:,0],P[index][:,1])
+        axes = plt.gca()
+        axes.set_xlim([0,1000])
+        plt.show()
+    index=np.array(index)[np.argsort(P[index][:,0])][len(index)-in_index.shape[0]:len(index)]
+    index=index[np.argsort(P[index][:,1])]
+    return index
     
+def abstract_layer(in_index, W, t):                                            #unfold the total connection matrix into layer by layer connection matrix
+    index=in_index
+    Wt=[]
+    for i in range(t-1):
+        x=np.zeros(W.shape[0])
+        for j in index:x[j]=1
+        x=W.dot(x)
+        x=(x > 0).astype(int)
+        index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+        Wt.append(W[index_new[:, None], index])
+        index=index_new
+        print(Wt[i].shape)
+    return Wt
 
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
@@ -167,18 +199,21 @@ def generate_poly(data_size, n, degree):
 
 
 #global variable
-size=70
+size=30
 n_cell=300
 dataset_size=500
 dataset_size_t=400
-t=8
-sigma=140
+t=7
+sigma=15
 d=100
 alpha=0.001
 error=[]
 
 
 P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
+plt.scatter(P[in_index][:,0],P[in_index][:,1])
+plt.scatter(P[out_index][:,0],P[out_index][:,1])
+plt.show()
 wc=copy.deepcopy(W)
 wc*=(2*np.random.random(wc.shape)-1)
     
@@ -194,11 +229,13 @@ x[in_index]=scaled_data
 x_t=np.zeros((n_cell,dataset_size_t))
 x_t[in_index]=scaled_data_t
    
-wc,e=train(x, wc, t, in_index, out_index, 100, alpha)#iter 1000
+wc,e=train(x, wc, t, in_index, out_index, 500, alpha)#iter 1000
 
 
 plt.show()
 X, x=forward(x, wc, t)
+#for i in X:
+#    print(i[out_index])
 plt.plot(np.linspace(-1, 1, size),scaled_data)
 plt.plot(np.linspace(-1, 1, size),x[out_index])
 plt.show()
@@ -216,6 +253,7 @@ for i in range(3):
 
 print(e) 
 print(err(x_t, wc, t)) 
+for i in range(7):print(np.mean(np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]))
 """
 visualize(in_index[10:11],15)
 """    

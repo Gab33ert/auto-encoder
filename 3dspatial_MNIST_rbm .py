@@ -27,7 +27,7 @@ def MNIST_red(x):
     return x[:,ind, :][:,:, ind]
     
 class store(object): 
-    def __init__(self, build_height=0, build_d=0, build_sigma=0, W=0, Wt=0, P=0, index_list=0, Spatial=0, epsilon=0, alpha=0, mode=0, iterr_rbm=0, w=0, b=0, c=0, fe=0):
+    def __init__(self, build_height=0, build_d=0, build_sigma=0, W=0, Wt=0, P=0, index_list=0, Spatial=0, epsilon=0, alpha=0, mode=0, iterr_rbm=0, w=0, b=0, c=0, fe=0, ttt=0):
         self.build_height = build_height#build length
         self.build_d = build_d#connection length
         self.build_sigma = build_sigma#connection width
@@ -47,6 +47,7 @@ class store(object):
         self.c = c#learned forward bias
         
         self.fe = fe#training free energy
+        self.ttt = ttt
 
  
 
@@ -63,11 +64,12 @@ alpha=0.0005#backprop rate
 height=7
 epsilon=[0]*4#rbm rate
 fe=[]
+ttt=[]
 Spatial=True
 
 P, W,in_index =top.build_3d(height, d, sigma)
 #Wt=top.abstract_layer(in_index, W, t)#_local_backward_restriction
-Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t, 16)
+Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t, 385)
 at.visualize_abstract_3d(P, W, index_list, t)
 at.degree_distribution(Wt)
 #at.connection_forward_0(Wt)
@@ -134,12 +136,13 @@ if answer == "y":
         #layer 1
         seconds = time.time()
         fe.append(rbmt.train_spatial_rbm(x_train, b[0], c[0], w[0], iterr_rbm[0], mode[0], epsilon[0], alpha[0], x_test, dataset_size, 1, 50, Wt[0]))
+        ttt.append(time.time()-seconds)
+        print("time",time.time()-seconds)
+        print("error", rbmv.error(x_test,b[0],c[0],w[0]))
         for i in range(0,w[0].shape[0]-1,w[0].shape[0]//5):
             plt.imshow(w[0][i,:].reshape(ims,ims))
             plt.colorbar()
             plt.show()
-        print("error", rbmv.error(x_test,b[0],c[0],w[0]))
-        print("time",time.time()-seconds)
         rbmv.gibbs_sampling(x_test[:,0:1], b[0],c[0],w[0], 2, scaler, mode[0])
         rbmv.gibbs_sampling(x_test[:,1:2], b[0],c[0],w[0], 2, scaler, mode[0])
         rbmv.gibbs_sampling(x_test[:,20:21], b[0],c[0],w[0], 2, scaler, mode[0])
@@ -168,10 +171,11 @@ if answer == "y":
         w[1]=w[1]*np.random.normal(0, 0.01, w[1].shape)
         
         #layer 2
-        seconds = time.time()
         x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
         x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        seconds = time.time()
         fe.append(rbmt.train_spatial_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm[1], mode[1], epsilon[1], alpha[1], x_test_1, dataset_size, 1, 50, Wt[1]))
+        ttt.append(time.time()-seconds)
         print("layer 2")
         print("error", rbmv.error(x_test_1,b[1],c[1],w[1]))
         print("time",time.time()-seconds)
@@ -201,10 +205,11 @@ if answer == "y":
         w[2]=copy.deepcopy(Wt[2])
         w[2]=w[2]*np.random.normal(0, 0.01, w[2].shape) 
         #layer 3
-        seconds = time.time()
         x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
         x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        seconds = time.time()
         fe.append(rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm[2], mode[2], epsilon[2], alpha[2], x_test_2, dataset_size, 1, 50, Wt[2]))
+        ttt.append(time.time()-seconds)
         print("layer 3")
         print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
         print("time",time.time()-seconds)
@@ -233,11 +238,11 @@ if answer == "y":
         w[3]=copy.deepcopy(Wt[3])
         w[3]=w[3]*np.random.normal(0, 0.01, w[3].shape) 
         #layer 4
-        seconds = time.time()
-
         x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
         x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        seconds = time.time()
         fe.append(rbmt.train_spatial_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm[3], mode[3], epsilon[3], alpha[3], x_test_3, dataset_size, 1, 50, Wt[3]))
+        ttt.append(time.time()-seconds)
         print("layer 4")
         print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
         print("time",time.time()-seconds)
@@ -267,10 +272,10 @@ if answer == "y":
 
     
     else:
-        epsilon=[0.0002, 0.004, 0.005, 0.1]
+        epsilon=[0.01, 0.04, 0.01, 0.01]
         alpha=[8, 8, 8, 8]
-        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.1]]
-        iterr_rbm=[5000, 2000, 2000, 10000]
+        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.1]]#[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.2]]
+        iterr_rbm=[5000, 1000, 2000, 5000]
         
         b[0]=np.random.randn(Wt[0].shape[1],1)
         c[0]=np.zeros(c[0].shape)
@@ -278,6 +283,7 @@ if answer == "y":
         
         seconds = time.time()
         fe.append(rbmt.train_rbm(x_train, b[0], c[0], w[0], iterr_rbm[0], mode[0], epsilon[0], alpha[0], x_test, dataset_size, 1, 50))
+        ttt.append(time.time()-seconds)
         for i in range(w[0].shape[0]-10, w[0].shape[0]-5):
             plt.imshow(w[0][i,:].reshape(ims,ims))
             plt.colorbar()
@@ -297,10 +303,11 @@ if answer == "y":
         c[1]=np.zeros(c[1].shape)
         w[1]=np.ones(w[1].shape)*np.random.normal(0, 0.01, w[1].shape)
     
-        seconds = time.time()
         x_train_1=rbmt.sample_rbm_forward(x_train, c[0], w[0])
         x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        seconds = time.time()
         fe.append(rbmt.train_rbm(x_train_1, b[1],c[1],w[1], iterr_rbm[1], mode[1], epsilon[1], alpha[1], x_test_1, dataset_size, 1, 50))
+        ttt.append(time.time()-seconds)
         print("time",time.time()-seconds)
     
      
@@ -315,15 +322,17 @@ if answer == "y":
     
      
         #layer 3
-        seconds = time.time()
         x_train_2=rbmt.sample_rbm_forward(x_train_1, c[1], w[1])
         x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        seconds = time.time()
         fe.append(rbmt.train_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm[2], mode[2], epsilon[2], alpha[2], x_test_2, dataset_size, 1, 200))
-
+        ttt.append(time.time()-seconds)
         print("layer 3")
         print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
         print("time",time.time()-seconds)
         rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
+    
+
     
         #layer 4
         
@@ -331,11 +340,12 @@ if answer == "y":
         c[3]=np.zeros(c[3].shape)
         w[3]=np.ones(w[3].shape)*np.random.normal(0, 0.01, w[3].shape)
     
-        
-        seconds = time.time()
+    
         x_train_3=rbmt.sample_rbm_forward(x_train_2, c[2], w[2])
         x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        seconds = time.time()
         fe.append(rbmt.train_rbm(x_train_3, b[3],c[3],w[3], iterr_rbm[3], mode[3], epsilon[3], alpha[3], x_test_3, dataset_size, 1, 200))
+        ttt.append(time.time()-seconds)
         print("layer 4")
         print("error", rbmv.error(x_test_3,b[3],c[3],w[3]))
         print("time",time.time()-seconds)
@@ -344,7 +354,48 @@ if answer == "y":
         x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
         n=10
         pi=0
-        p=50#x_test_4.shape[0]
+        p=100#x_test_4.shape[0]
+        
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_1[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_2[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_3[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
             q=0
@@ -407,8 +458,8 @@ if answer == "y":
         
     answer = input("Do you want to save it y/n?")
     if answer == "y":
-        memory = store(height, d, sigma, W, Wt, P, index_list, Spatial, epsilon, alpha, mode, iterr_rbm, w, b, c, fe)
-        with open('sparse_spatial_dbn.pkl', 'wb') as output:
+        memory = store(height, d, sigma, W, Wt, P, index_list, Spatial, epsilon, alpha, mode, iterr_rbm, w, b, c, fe, ttt)
+        with open('sparse_dbn_density_restrained_20_001.pkl', 'wb') as output:
             pickle.dump(memory, output, pickle.HIGHEST_PROTOCOL)
     elif answer == "n":
         print("ok")

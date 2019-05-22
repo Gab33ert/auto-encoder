@@ -56,7 +56,7 @@ def visualize_abstract_3d(P, W, index_list, t):                                 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         ax.scatter(P[index_list[i+1]][:,0],P[index_list[i+1]][:,1], P[index_list[i+1]][:,2], color="green")
-        #ax.scatter(P[index_list[i]][:,0],P[index_list[i]][:,1], P[index_list[i]][:,2], color="red")
+        ax.scatter(P[index_list[i]][:,0],P[index_list[i]][:,1], P[index_list[i]][:,2], color="red")
         ax.scatter(P[:,0],P[:,1], P[:,2], s=0.5)
         plt.show()
 
@@ -120,5 +120,6 @@ def connection_forward_0(Wt):                                               #det
     
 def degree_distribution(Wt):                                                     #plot histogram of the distribution of number of connection per neurone in each rbm
     for i in range(len(Wt)):
-        plt.hist(np.append(np.sum(Wt[i], axis=1), np.sum(Wt[i], axis=0)))
+        plt.hist(np.append(np.sum(Wt[i], axis=1), np.sum(Wt[i], axis=0)), label="degree distribution layer "+str(i+1))
+        plt.legend()
         plt.show()

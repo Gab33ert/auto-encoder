@@ -54,14 +54,22 @@ def build_3d(n, d, sigma):                                                     #
     for z in range(n):
         for y in range(i):
             for x in range(i):
-                #if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
-                cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
-                cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
-                cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
+                if z!=0:
+                    #if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:#0.15*np.exp(-0.1*z):#
+                    cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
+                else:
+                    cells_pos[x+i*(y+i*z),0]=x*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),1]=y*1000/(i-1)
+                    cells_pos[x+i*(y+i*z),2]=1
     #cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
+    for y in range(i):
+        for x in range(i):
+            cells_pos[x+i*y,2]=0
     cells_pos[:,2]+=(1000/(i-1))*np.random.random(cells_pos[:,2].shape)
-    cells_pos[0:783, 2]=(2500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
-    cells_pos[i*i-1 , 2]=cells_pos[i*i-2 , 2]
+    #cells_pos[0:783, 2]=(2500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
+    #cells_pos[i*i-1 , 2]=cells_pos[i*i-2 , 2]
     return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(i*i)
 """
 def build_3d(n, d, sigma):                                                     #n is the depth, d and sigma are connection caracteristics
@@ -108,7 +116,7 @@ def connect_3d(P, d, sigma):
     dP = P.reshape(1,n,3) - P.reshape(n,1,3)
     # Shifted Distances 
     D = np.hypot(dP[...,0], dP[...,1])
-    D = np.hypot(D, dP[...,2]+d)
+    D = np.hypot(0.01*D, dP[...,2]+d)
     #W = np.zeros((n,n))
     W=np.where((np.random.uniform(0,1,(n,n)) < np.exp(-(D**2)/(2*sigma**2))), 1, 0)
     s=np.argwhere(W==1)
@@ -125,7 +133,7 @@ def connect_3d_sharp(P, d, sigma):
     D = np.minimum(np.hypot(dP[...,0], dP[...,1]+1000),D) 
     D = np.minimum(np.hypot(dP[...,0]+1000, dP[...,1]+1000),D)
     # Shifted Distances 
-    D = np.hypot(0.1*D, dP[...,2]+d)
+    D = np.hypot(0.01*D, dP[...,2]+d)
     #W = np.zeros((n,n))
     W=np.where((D-sigma)<0, 1 , 0)#np.where((np.random.uniform(0,1,(n,n)) < np.exp((-np.power(np.maximum(0,D-4*sigma),2))/(2*(sigma/2)**2))), 1, 0)
     s=np.argwhere(W==1)
