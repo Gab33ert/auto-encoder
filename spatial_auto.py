@@ -10,23 +10,26 @@ from sklearn import preprocessing
 np.set_printoptions(threshold=np.inf)
 
 
-def connect(P, n_input_cells, n_output_cells, d, sigma):
-
-    
-
+def connect(P, n_input_cells, n_output_cells, d, sigma, wide):
+    c=0
+    b=0
     n = len(P)
     dP = P.reshape(1,n,2) - P.reshape(n,1,2)
     # Shifted Distances 
-    D = np.hypot(dP[...,0]+d, 0.05*dP[...,1])
+    D = np.hypot(dP[...,0]+d, wide*dP[...,1])
     W = np.zeros((n,n))
     for i in range(n):
         for j in range(n):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))) & (P[i,0]<P[j,0]):
-                W[j,i]=1  
+            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):# & (P[i,0]<P[j,0]):
+                W[j,i]=1 
+                b+=1
+                if (P[i,0]>P[j,0]):
+                    c+=1
+    print("c",c, "b", b)
     return W
 
 
-def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, seed=0):
+def build(n_cells, n_input_cells = 32, n_output_cells = 32, wide=0.05, sparsity = 0.01, seed=0):
     """
 
     Parameters:
@@ -65,13 +68,24 @@ def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, see
     cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
     #cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
     in_index=cells_in[:,0]
-    in_index=in_index[np.argsort(P[in_index][:,1])]
+    in_index=in_index[np.argsort(cells_pos[in_index][:,1])]
     
-    W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma)
+    W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma, wide)
     out_index=visualize(W, cells_pos, cells_in[:,0], t)
 
     return cells_pos/1000, W, in_index, out_index#cells_out[:,0]#, W_in, W_out, bias
     
+def unspatial(W, in_index):#completly rewire each layer
+    index=in_index
+    for i in range(t-1):
+        x=np.zeros(W.shape[0])
+        for j in index:x[j]=1
+        x=W.dot(x)
+        x=(x > 0).astype(int)
+        index_new=np.asarray([idx for idx, v in enumerate(x) if v])
+        W[index_new[:, None], index]=np.ones( W[index_new[:, None], index].shape)
+        index=index_new
+    return(W)
 
 
 def sigmoid(x):
@@ -98,7 +112,7 @@ def backward(x_in, w, t, in_index, out_index, alpha):#for i in range(7):print(np
         idxx.append(idx)
         ro.append(ii[idx])
     
-    beta=[0, 0, 0, 1, 0, 0]
+    beta=[0, 0, 0, 0, 0, 0]
     x_in_reshape=np.zeros(x_in.shape)
     x_in_reshape[out_index]=x_in[in_index]
 
@@ -112,7 +126,7 @@ def backward(x_in, w, t, in_index, out_index, alpha):#for i in range(7):print(np
         b=beta[i]*sigmoid(w.dot(X[i]))
         e.append(dsigmoid(w.dot(X[i]))*(np.transpose(w).dot(e[t-2-i])+b))#+np.transpose(b))
     for i in range(t):
-        w-=alpha*(e[t-1-i]).dot(np.transpose(X[i]))*W
+        w-=alpha*((e[t-1-i]).dot(np.transpose(X[i]))+w)*W
     return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
 
 def err(x_in, w, t):
@@ -130,7 +144,6 @@ def err(x_in, w, t):
     
 def train(x_in, w, t, in_index, out_index, iterr, alpha):
     error=np.zeros(iterr)
-    c=0
     for i in range(iterr):
         #x_batch=x_in[:,c:c+32]
         #c+=32
@@ -156,19 +169,23 @@ def visualize(W, P, in_index, t):
     axes = plt.gca()
     axes.set_xlim([0,1000])
     plt.show()
+    l=[]
     for i in range(t-1):
         x=np.zeros(W.shape[0])
         for j in index:x[j]=1
         print(np.sum(x))
         x=W.dot(x)
         x=(x > 0).astype(int)
-        index=[idx for idx, v in enumerate(x) if v]
+        index_n=[idx for idx, v in enumerate(x) if v]
+        l.append([np.sum(W[index_n,:][:,index]),len(index)*len(index_n)])
+        index=index_n
         plt.scatter(P[index][:,0],P[index][:,1])
         axes = plt.gca()
         axes.set_xlim([0,1000])
         plt.show()
     index=np.array(index)[np.argsort(P[index][:,0])][len(index)-in_index.shape[0]:len(index)]
     index=index[np.argsort(P[index][:,1])]
+    print(l)
     return index
     
 def abstract_layer(in_index, W, t):                                            #unfold the total connection matrix into layer by layer connection matrix
@@ -208,52 +225,112 @@ sigma=15
 d=100
 alpha=0.001
 error=[]
-
-
-P, W, in_index, out_index = build(n_cell, size, size,sparsity=0.05, seed=1)
-plt.scatter(P[in_index][:,0],P[in_index][:,1])
-plt.scatter(P[out_index][:,0],P[out_index][:,1])
-plt.show()
-wc=copy.deepcopy(W)
-wc*=(2*np.random.random(wc.shape)-1)
-    
-
+sparsity=[]
+connection_use=[]
+iterr=1000
+#wide=[0.2, 0.1, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001]
+wide=0.05
+dd=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
-data=generate_poly(size, dataset_size, 20)
-data_t=generate_poly(size, dataset_size_t, 20)
+data=generate_poly(size, dataset_size, 4)
+data_t=generate_poly(size, dataset_size_t, 4)
 scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
     
-x=np.zeros((n_cell,dataset_size))
-x[in_index]=scaled_data
-x_t=np.zeros((n_cell,dataset_size_t))
-x_t[in_index]=scaled_data_t
-   
-wc,e=train(x, wc, t, in_index, out_index, 500, alpha)#iter 1000
 
 
-plt.show()
-X, x=forward(x, wc, t)
-#for i in X:
-#    print(i[out_index])
-plt.plot(np.linspace(-1, 1, size),scaled_data)
-plt.plot(np.linspace(-1, 1, size),x[out_index])
-plt.show()
-
-X, x=forward(x_t[:,0:4], wc, t)
 
 
-for i in range(3):
-    plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
-    plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
+for d in dd:
+    P, W, in_index, out_index = build(n_cell, size, size,  wide, sparsity=0.05, seed=1)
+    #unspatial(W, in_index)
+    x=np.zeros((n_cell,dataset_size))
+    x[in_index]=scaled_data
+    x_t=np.zeros((n_cell,dataset_size_t))
+    x_t[in_index]=scaled_data_t
+    
+    wc=copy.deepcopy(W)
+    wc*=(2*np.random.random(wc.shape)-1)
+    ws=copy.deepcopy(wc)
+        
+    
+       
+    wc,e=train(x, wc, t, in_index, out_index, iterr, alpha)#iter 1000
     plt.show()
-
-
-
-
-print(e) 
-print(err(x_t, wc, t)) 
-for i in range(7):print(np.mean(np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]))
+    
+    X, x=forward(x_t[:,0:4], wc, t)
+    for i in range(3):
+        plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
+        plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
+        plt.show()
+    X, x=forward(x_t, wc, t)
+    
+    
+    print(e) 
+    print(err(x_t, wc, t)) 
+    error.append(err(x_t, wc, t)[0])
+    amin=100
+    for i in range(7):
+        a=np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]
+        print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
+        if i==0:amax=a.shape[0]*np.mean(a)
+        if a.shape[0]*np.mean(a)<amin:amin=a.shape[0]*np.mean(a)
+    sparsity.append(amin/amax)
+        
+    p=np.sum(np.where(ws-wc!=0, 1, 0))
+    pp=np.sum(np.where(ws!=0,1,0))
+    print(p, pp, p/pp)
+    connection_use.append(p/pp)
+"""
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('error')
+ax1.set_xlabel('d')
+plt.plot(dd, error)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('sparsity')
+ax1.set_xlabel('d')
+plt.plot(dd, sparsity)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('error')
+ax1.set_xlabel('sparsity')
+plt.plot(sparsity, error)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('connection_use')
+ax1.set_xlabel('d')
+plt.plot(dd, connection_use)
+plt.show()
+"""
 """
 visualize(in_index[10:11],15)
 """    
+"""fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('error')
+ax1.set_xlabel('wide')
+plt.plot(wide, error)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('sparsity')
+ax1.set_xlabel('wide')
+plt.plot(wide, sparsity)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('error')
+ax1.set_xlabel('sparsity')
+plt.plot(sparsity, error)
+plt.show()
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('connection_use')
+ax1.set_xlabel('wide')
+plt.plot(wide, connection_use)
+plt.show()"""

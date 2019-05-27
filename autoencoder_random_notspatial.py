@@ -136,8 +136,9 @@ def forward(x, w):
         x=sigmoid(w[i].dot(x))
     return X, x
 
-def backprop(x_in, w, alpha, Spatial): #propagate back, train W one step and resturn actual error
+def backprop(x_in, x_in_t, w, alpha, Spatial): #propagate back, train W one step and resturn actual error
     X, x_out=forward(x_in,w)
+    X, x_out_t=forward(x_in_t,w)
     l=len(w)-1
     e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
     for i in range(l-1,-1,-1):
@@ -150,16 +151,17 @@ def backprop(x_in, w, alpha, Spatial): #propagate back, train W one step and res
         for i in range(l+1):
             for j in range(x_in.shape[1]):
                w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
-    return w, (np.sum((x_out-x_in)**2))/(x_in.shape[1])
+    return w, (np.sum((x_out_t-x_in_t)**2))/(x_in_t.shape[1]), (np.sum((x_out-x_in)**2))/(x_in.shape[1])
 
     
-def train(x_in, w, iterr, alpha, Spatial):
+def train(x_in, x_in_t, w, iterr, alpha, Spatial):
     error=np.zeros(iterr)
+    errror=np.zeros(iterr)
     for i in range(iterr):
-            w, error[i] = backprop(x_in, w, alpha, Spatial)
+            w, error[i], errror[i] = backprop(x_in, x_in_t, w, alpha, Spatial)
     plt.loglog(error)
     plt.show()
-    return w, error
+    return w, error, errror
 
 
 
@@ -180,6 +182,7 @@ def scheme_vis(layer, W):
     for i in layer:
         plt.scatter(i[:,0], i[:,1])
     plt.axis("off")
+    plt.axis('equal')
     plt.savefig("fig1.png")
     plt.show()
     
@@ -200,6 +203,7 @@ def scheme_vis(layer, W):
         seg=LineCollection(lines, colors=c[i-1])
         ax.add_collection(seg)
     plt.axis("off")
+    ax.axis('equal')
     plt.savefig("fig2.png")
     plt.show()
     print(conteur1, conteur2)
@@ -228,6 +232,8 @@ scaler = preprocessing.MinMaxScaler()
 data=generate_poly(size, 50, 4)
 scaled_data=scaler.fit_transform(data)
 unscaled_data=scaler.inverse_transform(scaled_data)
+data_t=generate_poly(size, 50, 4)
+scaled_data_t=scaler.transform(data_t)
 
 #data=np.ones((10,2))
 #data[0,0]=0
@@ -235,23 +241,49 @@ unscaled_data=scaler.inverse_transform(scaled_data)
 
 #data=np.random.random([size, 1000])
 s1=time.time()
-a,b=train(scaled_data, w, 10000, 0.03, True)
+a,b, bb=train(scaled_data, scaled_data_t, w, 10000, 0.03, True)
 s1=time.time()-s1
 X, x=forward(scaled_data,w)
 
-plt.plot(x[:,3:6]) 
-plt.plot(scaled_data[:,3:6])
+fig , ax1= plt.subplots()
+plt.figure(figsize=(5,5))
+ax1.set_aspect(30)
+plt.plot(x[:,3:5], label="reconstructed polynomials") 
+plt.plot(scaled_data[:,3:5],  label="test polynomials")
+plt.legend()
+plt.savefig("fig4.png")
 plt.show()
 
 for i in range(len(w)):
     w[i]=(2*np.random.random(w[i].shape)-1)
 s2=time.time()
-c,d=train(scaled_data, w, 10000, 0.03, False)
+#c,d, dd=train(scaled_data, scaled_data_t, w, 10000, 0.03, False)
 s2=time.time()-s2
 
+
+fig = plt.figure()
+fig.subplots_adjust(top=0.8)
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('Mean Square Error')
+ax1.set_xlabel('Iterration')
+
 plt.loglog(b, label="Spatial")
-plt.loglog(d, label="not Spatial")
+#plt.loglog(d, label="not Spatial")
 plt.legend()
+#plt.savefig("fig3.png")
+plt.show()
+
+
+fig = plt.figure()
+fig.subplots_adjust(top=0.8)
+ax1 = fig.add_subplot(211)
+ax1.set_ylabel('Mean Square Error')
+ax1.set_xlabel('Iterration')
+
+plt.loglog(b, label="Spatial")
+#plt.loglog(d, label="not Spatial")
+plt.legend()
+#plt.savefig("fig3.png")
 plt.show()
 
 print(s2, s1)
