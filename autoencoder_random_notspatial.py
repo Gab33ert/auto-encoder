@@ -99,7 +99,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 	    density[:,i]=np.power(((3.85)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "aba.npy"#aba.npy#autoencoder-second-degree.npy
+    filename = "autoencoder-second-degree.npy"#aba.npy#autoencoder-second-degree.npy
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -138,7 +138,7 @@ def forward(x, w):
 
 def backprop(x_in, x_in_t, w, alpha, Spatial): #propagate back, train W one step and resturn actual error
     X, x_out=forward(x_in,w)
-    X, x_out_t=forward(x_in_t,w)
+    X_t, x_out_t=forward(x_in_t,w)
     l=len(w)-1
     e=[dsigmoid(w[l].dot(X[l]))*(x_out-x_in)]
     for i in range(l-1,-1,-1):
@@ -146,22 +146,22 @@ def backprop(x_in, x_in_t, w, alpha, Spatial): #propagate back, train W one step
     if Spatial:
         for i in range(l+1):
             for j in range(x_in.shape[1]):
-               w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])*W[i]
+               w[i]-=alpha*(np.outer(e[l-i][:, j], X[i][:, j]))*W[i]
     else:
         for i in range(l+1):
             for j in range(x_in.shape[1]):
                w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
-    return w, (np.sum((x_out_t-x_in_t)**2))/(x_in_t.shape[1]), (np.sum((x_out-x_in)**2))/(x_in.shape[1])
+    return w, (np.sum((x_out-x_in)**2))/(x_in.shape[1]), (np.sum((x_out_t-x_in_t)**2))/(x_in_t.shape[1])
 
     
 def train(x_in, x_in_t, w, iterr, alpha, Spatial):
     error=np.zeros(iterr)
-    errror=np.zeros(iterr)
+    error_t=np.zeros(iterr)
     for i in range(iterr):
-            w, error[i], errror[i] = backprop(x_in, x_in_t, w, alpha, Spatial)
+            w, error[i], error_t[i]= backprop(x_in, x_in_t, w, alpha, Spatial)
     plt.loglog(error)
     plt.show()
-    return w, error, errror
+    return w, error, error_t
 
 
 
@@ -216,7 +216,9 @@ def scheme_vis(layer, W):
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
 l=5 
-size=30
+size=10
+alpha=0.03#0.03
+iterr=10000
 
 P, W = build(50, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=2)
 w=copy.deepcopy(W)
@@ -235,29 +237,34 @@ unscaled_data=scaler.inverse_transform(scaled_data)
 data_t=generate_poly(size, 50, 4)
 scaled_data_t=scaler.transform(data_t)
 
-#data=np.ones((10,2))
-#data[0,0]=0
-#data[1,0]=0
-
-#data=np.random.random([size, 1000])
 s1=time.time()
-a,b, bb=train(scaled_data, scaled_data_t, w, 10000, 0.03, True)
+a,b,e=train(scaled_data, scaled_data_t, w, iterr, alpha, True)
 s1=time.time()-s1
-X, x=forward(scaled_data,w)
+X, x=forward(scaled_data_t,w)
+
+li=[]
+for i in range(len(X)):
+    a=np.mean(np.abs(X[i]), axis=1)
+    print(a.shape[0], np.mean(a))
+    li.append(a.shape[0]*np.mean(a))
+a=np.mean(np.abs(x), axis=1)
+print(a.shape[0], np.mean(a))
+li.append(a.shape[0]*np.mean(a))
 
 fig , ax1= plt.subplots()
 plt.figure(figsize=(5,5))
 ax1.set_aspect(30)
 plt.plot(x[:,3:5], label="reconstructed polynomials") 
 plt.plot(scaled_data[:,3:5],  label="test polynomials")
-plt.legend()
-plt.savefig("fig4.png")
+#plt.legend(loc="upper right")
+#plt.savefig("fig4.png")
 plt.show()
 
 for i in range(len(w)):
     w[i]=(2*np.random.random(w[i].shape)-1)
+    
 s2=time.time()
-#c,d, dd=train(scaled_data, scaled_data_t, w, 10000, 0.03, False)
+c,d,f=train(scaled_data, scaled_data_t, w, iterr, alpha, False)
 s2=time.time()-s2
 
 
@@ -268,11 +275,10 @@ ax1.set_ylabel('Mean Square Error')
 ax1.set_xlabel('Iterration')
 
 plt.loglog(b, label="Spatial")
-#plt.loglog(d, label="not Spatial")
+plt.loglog(d, label="not Spatial")
 plt.legend()
 #plt.savefig("fig3.png")
 plt.show()
-
 
 fig = plt.figure()
 fig.subplots_adjust(top=0.8)
@@ -280,10 +286,34 @@ ax1 = fig.add_subplot(211)
 ax1.set_ylabel('Mean Square Error')
 ax1.set_xlabel('Iterration')
 
-plt.loglog(b, label="Spatial")
-#plt.loglog(d, label="not Spatial")
+plt.loglog(e, label="Spatial")
+plt.loglog(f, label="not Spatial")
 plt.legend()
 #plt.savefig("fig3.png")
+plt.show()
+X, x=forward(scaled_data_t,w)
+
+lii=[]
+for i in range(len(X)):
+    a=np.mean(np.abs(X[i]), axis=1)
+    print(a.shape[0], np.mean(a))
+    lii.append(a.shape[0]*np.mean(a))
+a=np.mean(np.abs(x), axis=1)
+print(a.shape[0], np.mean(a))
+lii.append(a.shape[0]*np.mean(a))
+
+plt.plot(li, label="spatial")
+plt.plot(lii, label="non spatial")
+plt.legend()
+plt.show()
+
+fig , ax1= plt.subplots()
+plt.figure(figsize=(5,5))
+ax1.set_aspect(30)
+plt.plot(x[:,3:5], label="reconstructed polynomials") 
+plt.plot(scaled_data[:,3:5],  label="test polynomials")
+#plt.legend(loc="upper right")
+#plt.savefig("fig4.png")
 plt.show()
 
 print(s2, s1)

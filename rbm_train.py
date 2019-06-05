@@ -101,7 +101,7 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, alpha, x_test, dataset
                 fe.append(rbmv.pseudo_likelihood_rbm(x_test, b, c, w, f))
                 #fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
                 t2+=time.time()-tt   
-    plt.hist(np.mean(func.sigmoid(c+w.dot(visible)), axis=1))
+    plt.hist(np.mean(func.sigmoid(c+w.dot(visible)), axis=1), bins=30)
     plt.show() 
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")

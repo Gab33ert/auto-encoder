@@ -52,13 +52,21 @@ def visualize_3d(P, W, in_index, t):
     print(l)
 
 def visualize_abstract_3d(P, W, index_list, t):                                   #same as usual visualize function but using the abstract layer list
-    for i in range(t-1):
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.scatter(P[index_list[i+1]][:,0],P[index_list[i+1]][:,1], P[index_list[i+1]][:,2], color="green")
-        ax.scatter(P[index_list[i]][:,0],P[index_list[i]][:,1], P[index_list[i]][:,2], color="red")
-        ax.scatter(P[:,0],P[:,1], P[:,2], s=0.5)
-        plt.show()
+    fig = plt.figure()
+    for i in range(t):
+        ax=fig.add_subplot(221+i, projection='3d')
+        #ax=fig.gca(projection='3d')
+        ax.scatter(P[:,0],P[:,1], P[:,2], s=0.2, color="red")
+        #ax.scatter(P[index_list[i+1]][:,0],P[index_list[i+1]][:,1], P[index_list[i+1]][:,2], color="green")
+        ax.scatter(P[index_list[i]][:,0],P[index_list[i]][:,1], P[index_list[i]][:,2], s=2, color="green")
+        ax.set_title(label="layer "+str(i+1))
+        ax.grid(True)
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_zticklabels([])
+    plt.legend()
+    #plt.savefig("3dLayers.pdf")
+    plt.show()
 
     
 def analyze_topology_back(Wt, depth):                                           #Plot histogram of the number of neurons in layers number depth that has a given % of connection to the input rate.

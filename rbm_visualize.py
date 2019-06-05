@@ -65,7 +65,7 @@ def gibbs_sampling(visible, b, c, w, n, scaler, mode):
         for i in range(n):
             hidden=rbmt.sample_rbm_forward(a, c, w)
             visible=rbmt.sample_grbm_backward(hidden, b, w)
-        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible)).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
         plt.show()
     else:
@@ -111,3 +111,16 @@ def fake_data(b, c, w, n):
 def error(visible, b, c, w):
     a=visible
     return np.mean(np.abs(a-rbmt.sample_rbm_backward(rbmt.sample_rbm_forward(visible,c,w),b,w)))
+
+def mean_pearson(visible, b, c, w): #compute the mean on test set of the pearson coefficient(image similitude) between an input image and it's reconstruction
+    n=len(w)-1
+    hidden=rbmt.sample_rbm_forward(visible, c[0], w[0])
+    for i in range(n):
+        hidden=rbmt.sample_rbm_forward(hidden, c[i+1], w[i+1])
+    for i in range(n):
+        hidden=rbmt.sample_rbm_backward(hidden, b[n-i], w[n-i])
+    r_visible=rbmt.sample_grbm_backward(hidden, b[0], w[0])
+    v_m=np.mean(visible, axis=0)
+    r_v_m=np.mean(r_visible, axis=0)
+    a=np.sum((r_visible-r_v_m)*(visible-v_m), axis=0)/(visible.shape[0]*np.std(r_visible, axis=0)*np.std(visible, axis=0))
+    return np.mean(a), a

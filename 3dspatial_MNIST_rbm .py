@@ -56,7 +56,7 @@ size=784
 n_cell=1600
 dataset_size=10000
 dataset_size_t=300
-t=5
+t=4
 sigma=16#4
 ims=28
 d=27#260
@@ -65,11 +65,12 @@ height=7
 epsilon=[0]*4#rbm rate
 fe=[]
 ttt=[]
-Spatial=True
+Spatial=False
+
 
 P, W,in_index =top.build_3d(height, d, sigma)
 #Wt=top.abstract_layer(in_index, W, t)#_local_backward_restriction
-Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t, 385)
+Wt, index_list=top.abstract_layer_local_backward_restriction(in_index, W, t, 1)#385)
 at.visualize_abstract_3d(P, W, index_list, t)
 at.degree_distribution(Wt)
 #at.connection_forward_0(Wt)
@@ -123,9 +124,9 @@ x_test=np.transpose(scaler.transform(x_test))
 answer = input("Do you want to train y/n?")
 if answer == "y":
     if Spatial:
-        epsilon=[0.01, 0.05, 0.01, 0.07]
-        alpha=[0.5, 0.1, 0.1, 0.05]
-        mode=[[0, 0], [1, 0.5], [1, 0.3], [1, 0.1]]
+        epsilon=[0.01, 0.05, 0.01, 0.07] #RBMs learning rate
+        alpha=[1, 0.1, 0.01, 0.05]      #Sparsity learning rate ponderation
+        mode=[[0, 0], [1, 0], [1, 0], [1, 0.1]] #mode[i][0] 0 for grbm 1 for rbm   mode[i][1] 0 if no sparsity if !=0 mode[i][1]=target sparsity
         iterr_rbm=[3000, 1000, 3000, 1000]
             
         b[0]=np.random.randn(Wt[0].shape[1],1)
@@ -218,7 +219,7 @@ if answer == "y":
         x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
         n=20
         pi=0
-        p=200#x_test_4.shape[0]
+        p=min(200, x_test_3.shape[0])#x_test_4.shape[0]
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
             q=0
@@ -232,7 +233,7 @@ if answer == "y":
         ax.imshow(x)
         plt.show()
     
-    
+        """
         b[3]=np.zeros(b[3].shape)
         c[3]=np.zeros(c[3].shape)
         w[3]=copy.deepcopy(Wt[3])
@@ -256,7 +257,7 @@ if answer == "y":
         x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
         n=20
         pi=0
-        p=200#x_test_4.shape[0]
+        p=min(200, x_test_4.shape[0])#x_test_4.shape[0]
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
             q=0
@@ -269,13 +270,13 @@ if answer == "y":
         fig, ax = plt.subplots(figsize=(90, 10))
         ax.imshow(x)
         plt.show()
-
+        """
     
     else:
-        epsilon=[0.01, 0.04, 0.01, 0.01]
-        alpha=[8, 8, 8, 8]
-        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.1]]#[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.2]]
-        iterr_rbm=[5000, 1000, 2000, 5000]
+        epsilon=[0.001, 0.001, 0.001, 0.001]
+        alpha=[5, 0.5, 0.05, 8]
+        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0]]#[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.2]]
+        iterr_rbm=[6000, 2000, 2000, 10]
         
         b[0]=np.random.randn(Wt[0].shape[1],1)
         c[0]=np.zeros(c[0].shape)
@@ -332,7 +333,7 @@ if answer == "y":
         print("time",time.time()-seconds)
         rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
     
-
+        """
     
         #layer 4
         
@@ -352,9 +353,11 @@ if answer == "y":
         rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
         
         x_test_4=rbmt.sample_rbm_forward(x_test_3, c[3], w[3])
+        """
+        x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
         n=10
         pi=0
-        p=100#x_test_4.shape[0]
+        p=min(200,x_test_1.shape[0])#x_test_4.shape[0]
         
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
@@ -369,6 +372,7 @@ if answer == "y":
         ax.imshow(x)
         plt.show()
         
+        p=min(200,x_test_2.shape[0])
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
             q=0
@@ -382,6 +386,7 @@ if answer == "y":
         ax.imshow(x)
         plt.show()
         
+        p=min(200,x_test_3.shape[0])
         x=np.zeros((10*n, p))
         for j in range(10):                                                         #affiche l'encodage
             q=0
@@ -395,21 +400,6 @@ if answer == "y":
         ax.imshow(x)
         plt.show()
         
-        
-        x=np.zeros((10*n, p))
-        for j in range(10):                                                         #affiche l'encodage
-            q=0
-            i=0
-            while (q<n and i<300):
-                if y_test[i]==j:
-                    x[q+n*j, 0:p]=0.5*(x_test_4[pi:pi+p, i]+1)
-                    q+=1
-                i+=1
-        fig, ax = plt.subplots(figsize=(90, 10))
-        ax.imshow(x)
-        plt.show()
-            
-            
     
         
         for i in range(4):
@@ -459,7 +449,7 @@ if answer == "y":
     answer = input("Do you want to save it y/n?")
     if answer == "y":
         memory = store(height, d, sigma, W, Wt, P, index_list, Spatial, epsilon, alpha, mode, iterr_rbm, w, b, c, fe, ttt)
-        with open('sparse_dbn_density_restrained_20_001.pkl', 'wb') as output:
+        with open('no_restriction_sparse_dbn_non_spatial.pkl', 'wb') as output:
             pickle.dump(memory, output, pickle.HIGHEST_PROTOCOL)
     elif answer == "n":
         print("ok")
@@ -473,25 +463,110 @@ else:
     print("Please enter y or n.")
     
     
-
+strl=['no_restriction_sparse_dbn_non_spatial.pkl', 'no_restriction_spatial_dbn.pkl']#['sparse_dbn_non_spatial.pkl', 'no_restriction_sparse_dbn_non_spatial.pkl', 'no_restriction_sparse_spatial_dbn.pkl', 'no_restriction_spatial_dbn.pkl']
 answer = input("Do you want to load y/n?")
-if answer == "y":
-    with open('sparse_spatial_dbn.pkl', 'rb') as data:
-        memory = pickle.load(data)
-        w=memory.w 
-        b=memory.b 
-        c=memory.c 
+if answer == "y":#load already trained network parameter and plot reconstruction.
+    for i in range(6):
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(x_test[:,1+i:2+i]))).reshape(28,28), vmin=-100, vmax= 400)
+        plt.show()
+    fig = plt.figure()
+    for i in range(10):
+            if i<5:fig.add_subplot(6,5,1+i)
+            else:fig.add_subplot(6,5,11+i)
+            plt.axis('off')
+            plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(x_test[:,i]))).reshape(ims,ims), vmin=-100, vmax= 400)
+    k=0
+    for st in strl:
+        print(st)
+        with open(st, 'rb') as data:
+            memory = pickle.load(data)
+            w=memory.w 
+            b=memory.b 
+            c=memory.c 
+            
+            print("alpha", memory.alpha)
+            print("mode", memory.mode)
+        for i in range(10):
+            n=2
+            h=rbmt.sample_rbm_forward(x_test[:,i:i+1], c[0], w[0])
+            for j in range(n):
+                h=rbmt.sample_rbm_forward(h, c[j+1], w[j+1])
+            for j in range(n):
+                h=rbmt.sample_rbm_backward(h, b[n-j], w[n-j])
+            h=rbmt.sample_grbm_backward(h, b[0], w[0])
+            if i<5:fig.add_subplot(6,5,6+i+k)
+            else:fig.add_subplot(6,5,16+i+k)
+            plt.axis('off')
+            plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(h))).reshape(ims,ims), vmin=-100, vmax= 400)
+        k+=5
+                
         
-    
-    
-    rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 3, scaler)
-    rbmv.gibbs_deep_sampling(x_test[:,2:3], b, c, w, 3, scaler)
-    rbmv.gibbs_deep_sampling(x_test[:,3:4], b, c, w, 3, scaler)
-    
-    for i in range(4):
-        plt.plot(memory.fe[i][0], memory.fe[i][1], label="layer "+str(i+1))
-    plt.legend()
+        x_test_1=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+        x_test_2=rbmt.sample_rbm_forward(x_test_1, c[1], w[1])
+        x_test_3=rbmt.sample_rbm_forward(x_test_2, c[2], w[2])
+        
+        """
+        n=10
+        pi=0
+        p=min(200,x_test_1.shape[0])#x_test_4.shape[0]
+        
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_1[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        p=min(200,x_test_2.shape[0])
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_2[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        p=min(200,x_test_3.shape[0])
+        x=np.zeros((10*n, p))
+        for j in range(10):                                                         #affiche l'encodage
+            q=0
+            i=0
+            while (q<n and i<300):
+                if y_test[i]==j:
+                    x[q+n*j, 0:p]=0.5*(x_test_3[pi:pi+p, i]+1)
+                    q+=1
+                i+=1
+        fig, ax = plt.subplots(figsize=(90, 10))
+        ax.imshow(x)
+        plt.show()
+        
+        for i in range(3):
+            plt.plot(memory.fe[i][0], memory.fe[i][1], label="layer "+str(i+1))
+        plt.legend()
+        plt.show()
+        
+        plt.hist(np.mean((x_test_1+1)/2, axis=1), bins=30)
+        plt.show() 
+        plt.hist(np.mean((x_test_2+1)/2, axis=1), bins=30)
+        plt.show()     
+        plt.hist(np.mean((x_test_3+1)/2, axis=1), bins=30)
+        plt.show()         
+        """
+        
+    #plt.savefig("mnistDbn.pdf")
     plt.show()
+        
 elif answer == "n":
     print("ok")
 else:
