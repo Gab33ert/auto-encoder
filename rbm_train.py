@@ -39,11 +39,11 @@ def spatial_actualise_weight(visible, b, c, w, k, epsilon, alpha, mode, Wt):
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))*Wt
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
-    if mode[1]!=0:
+    if mode[1]!=0:#sparsity
         cwv=c+w.dot(visible)
         dsigm=func.dsigmoid(cwv)
         q=((2*mode[1]-1)-(1/visible.shape[1])*(2*np.sum(func.sigmoid(cwv), axis=1)-1)).reshape(w.shape[0],1)
-        q=q*np.abs(np.power(q,2))
+        #q=q*np.abs(np.power(q,2))
         w+=epsilon*alpha*q*(1/visible.shape[1])*(dsigm.dot(np.transpose(visible)))*Wt
         c+=epsilon*alpha*q*(1/visible.shape[1])*(np.sum(dsigm, axis=1).reshape(w.shape[0],1))
 
@@ -53,7 +53,7 @@ def actualise_weight(visible, b, c, w, k, epsilon, alpha, mode):
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))
     b+=(1/(visible.shape[1]))*epsilon*(np.sum(visible-visible_c, axis=1)).reshape(visible.shape[0],1)
     c+=(1/(visible.shape[1]))*epsilon*(np.sum(hidden-hidden_c, axis=1)).reshape(w.shape[0],1)
-    if mode[1]!=0:
+    if mode[1]!=0:#sparsity
         cwv=c+w.dot(visible)
         dsigm=func.dsigmoid(cwv)
         q=((2*mode[1]-1)-(2*np.mean(func.sigmoid(cwv), axis=1)-1)).reshape(w.shape[0],1)

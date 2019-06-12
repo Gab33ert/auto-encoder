@@ -121,7 +121,7 @@ def backward(x_in, w, t, in_index, out_index, alpha):#for i in range(7):print(np
     mask[out_index] = False
     x_out_reshape=x_out
     x_out_reshape[mask]=0
-    sparse_rate=[0, 0, 0, 0, 0, 0]
+    sparse_rate=[0, 0, 0, 0, 0, 0, 0, 0]
     e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
     for i in range(t-2,-1,-1):
         b=sparse_rate[i]*sigmoid(w.dot(X[i]))
@@ -139,7 +139,7 @@ def err(x_in, w, t):
     mask[out_index] = False
     x_out_reshape=x_out
     x_out_reshape[mask]=0
-    return (np.sum(np.abs(x_out_reshape-x_in_reshape)))/(in_index.shape[0]*x_in.shape[1]), np.max(x_out_reshape-x_in_reshape)
+    return (np.sum(np.abs(x_out_reshape-x_in_reshape)**2))/(in_index.shape[0]*x_in.shape[1]), np.max(x_out_reshape-x_in_reshape)
 
     
     
@@ -162,7 +162,7 @@ def train(x_in, x_in_t, w, t, in_index, out_index, iterr, alpha):
             a=0
         a+=1
         """
-    plt.semilogy(error)
+    plt.plot(error)
     plt.show()
     return w, error
 
@@ -237,20 +237,20 @@ def count_reccurence(dd):#how many times each connection is used
         l.append(s/5)
         ll.append(to/5)
     fig = plt.figure()
-    ax1 = fig.add_subplot(211)
+    ax1 = fig.add_subplot(111)
     ax1.set_ylim([0,1])
     ax1.set_ylabel('Fraction of connections only once')
     ax1.set_xlabel('d')
     plt.plot(dd, l)
-    plt.savefig("Fractionofconnectionsonlyonce.png")
+    plt.savefig("Fractionofconnectionsonlyonce.pdf")
     plt.show()
     fig = plt.figure()
-    ax1 = fig.add_subplot(211)
+    ax1 = fig.add_subplot(111)
     ax1.set_ylim([0,300])
     ax1.set_ylabel('Total number of connections')
     ax1.set_xlabel('d')
     plt.plot(dd, ll)
-    plt.savefig("Totalnumberofconnections.png")
+    plt.savefig("Totalnumberofconnections.pdf")
     plt.show()
 
 def generate_poly(data_size, n, degree):
@@ -264,8 +264,8 @@ def generate_poly(data_size, n, degree):
         a=2*np.random.random([degree+1])-1
         data[:,i]=poly(np.linspace(-1, 1, data_size), a)
     return data
-
 """
+
 size=30
 n_cell=300
 dataset_size=500
@@ -278,7 +278,7 @@ error=[]
 sparsity=[]
 connection_use=[]
 iterr=1000
-wide=[0.1, 0.085, 0.07, 0.04, 0.001]
+wide=[0.06, 0.06, 0.06, 0.06]#[0.1, 0.085, 0.07, 0.04, 0.001]
 #wide=0.05
 d=100#d=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
@@ -303,11 +303,12 @@ for w in wide:
                
     wc,e=train(x, x_t, wc, t, in_index, out_index, iterr, alpha)#iter 1000
     fig = plt.figure()    
-    ax1 = fig.add_subplot(211)
-    plt.semilogy(e)
-    ax1.set_ylabel('Mean Absolute Value Error')
+    ax1 = fig.add_subplot(111)
+    plt.plot(e)
+    ax1.set_ylim([0,0.5])
+    ax1.set_ylabel('Mean Squared Error')
     ax1.set_xlabel('Training iterration (x10)')
-    #plt.savefig("trainingCruveAuto.png")
+    #plt.savefig("trainingCruveAuto.pdf")
     plt.show()
     print("err ",err(x_t,wc,t))   
     X, x=forward(x_t, wc, t)
@@ -316,7 +317,8 @@ for w in wide:
         ax1 = fig.add_subplot(221+i-2)
         plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
         plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
-    #plt.savefig("AutoPolinom.png")
+        ax1.set_xlabel('input and output neurons')
+    #plt.savefig("AutoPolinom.pdf")
     plt.show()
     l=[]
     for i in range(7):
@@ -331,13 +333,13 @@ fig = plt.figure()
 ax1 = fig.add_subplot(111)
 j=0
 for i in ll:
-    plt.plot(i, label="wide=" +str(wide[j]))
+    plt.plot(i)#, label="wide "+str(wide[j]))
     ax1.set_ylabel('Mean number of activated neurons in each layers')
     ax1.set_xlabel('Layers')
     ax1.set_ylim([0,20])
     j+=1
-plt.legend(loc="upper left")
-#plt.savefig("AutoSparsityWide.png")
+#plt.legend(loc="upper left")
+#plt.savefig("AutoSparsity.pdf")
 plt.show()
 """
 """
@@ -354,7 +356,7 @@ error=[]
 sparsity=[]
 connection_use=[]
 iterr=1000
-wide=[0.15, 0.1, 0.09, 0.08, 0.07, 0.06, 0.05, 0.02, 0.001]
+wide=[0.05]#[0.15, 0.09, 0.08, 0.07, 0.06, 0.05, 0.02, 0.001]
 #wide=0.05
 d=100#d=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
@@ -400,7 +402,7 @@ for w in wide:
         #print(err(x_t, wc, t)) 
         er+=err(x_t, wc, t)[0]
         amin=100
-        for i in range(7):
+        for i in range(t):
             a=np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]
             #print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
             if i==0:amax=a.shape[0]*np.mean(a)
@@ -418,37 +420,37 @@ for i in ploterr:
     plt.loglog(i, label="wide"+str(wide[j]))
     j+=1
 plt.legend()
-ax1.set_ylabel('Mean Absolute Value Error')
+ax1.set_ylabel('Mean Squared Error')
 ax1.set_xlabel('Iterration')
-#plt.savefig("AutoTrainingCurveWideVariate.png")
+#plt.savefig("AutoTrainingCurveWideVariate.pdf")
 plt.show()
 
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
-ax1.set_ylabel('Mean Absolute Value Error')
+ax1 = fig.add_subplot(111)
+ax1.set_ylabel('Mean Squared Error')
 ax1.set_xlabel('Wide')
 plt.plot(wide, error)
-#plt.savefig("AutoErrorVsWideVariate.png")
+ax1.set_ylim([0,0.5])
+#plt.savefig("AutoErrorVsWideVariate.pdf")
 plt.show()
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(111)
 ax1.set_ylabel('Sparsity')
 ax1.set_xlabel('Wide')
 plt.plot(wide, sparsity)
-#plt.savefig("AutoSparsityVsWideVariate.png")
+ax1.set_ylim([0,0.6])
+#plt.savefig("AutoSparsityVsWideVariate.pdf")
 plt.show()
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
-ax1.set_ylabel('Mean Absolute Value Error')
+ax1 = fig.add_subplot(111)
+ax1.set_ylabel('Mean Squared Error')
 ax1.set_xlabel('Sparsity')
 plt.plot(sparsity, error)
+ax1.set_ylim([0,0.5])
+#plt.savefig("AutoSparsityVsErrorWideVariate.pdf")
 plt.show()
-
-
-
-
 """
-
+"""
 #global variable
 size=30
 n_cell=300
@@ -462,7 +464,7 @@ sparsity=[]
 connection_use=[]
 iterr=1000
 wide=0.05
-dd=[150, 100, 50, 25, 12, 6]
+dd=[100, 50, 40, 25, 12, 6]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
 data=generate_poly(size, dataset_size, 4)
 data_t=generate_poly(size, dataset_size_t, 4)
@@ -470,6 +472,7 @@ scaled_data=scaler.fit_transform(data)
 scaled_data_t=scaler.fit_transform(data_t)
 ploterr=[]
 Time=[]
+count_reccurence(dd)
 
 for d in dd:
     erro=0
@@ -532,31 +535,109 @@ plt.plot(Time)
 plt.show()
 
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(111)
 ax1.set_ylabel('error')
 ax1.set_xlabel('d')
 plt.plot(dd, error)
 plt.show()
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(111)
 ax1.set_ylabel('sparsity')
 ax1.set_xlabel('d')
 plt.plot(dd, sparsity)
 plt.show()
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(111)
 ax1.set_ylabel('error')
 ax1.set_xlabel('sparsity')
 plt.plot(sparsity, error)
 plt.show()
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
+ax1 = fig.add_subplot(111)
 ax1.set_ylabel('connection_use')
 ax1.set_xlabel('d')
 plt.plot(dd, connection_use)
 plt.show()
 
-
 """
-visualize(in_index[10:11],15)
-"""    
+#global variable
+size=30
+n_cell=300
+dataset_size=500
+dataset_size_t=400
+tt=[1, 3, 5, 6, 8, 9]
+sigma=15
+d=100
+alpha=0.001
+error=[]
+sparsity=[]
+connection_use=[]
+iterr=1000
+wide=0.05
+#wide=0.05
+d=100#d=[100]#, 50, 25, 12, 6, 3]
+scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
+data=generate_poly(size, dataset_size, 4)
+data_t=generate_poly(size, dataset_size_t, 4)
+scaled_data=scaler.fit_transform(data)
+scaled_data_t=scaler.fit_transform(data_t)
+ploterr=[]
+
+
+
+for t in tt:
+    print(t)
+    P, W, in_index, out_index = build(d, n_cell, size, size,  wide, sparsity=0.05, seed=1)
+    #unspatial(W, in_index)
+    x=np.zeros((n_cell,dataset_size))
+    x[in_index]=scaled_data
+    x_t=np.zeros((n_cell,dataset_size_t))
+    x_t[in_index]=scaled_data_t
+    
+    wc=copy.deepcopy(W)
+    wc*=(2*np.random.random(wc.shape)-1)
+    ws=copy.deepcopy(wc)
+            
+        
+           
+    wc,e=train(x, x_t, wc, t, in_index, out_index, iterr, alpha)#iter 1000
+    plt.show()
+    if j==0:ploterr.append(e)
+        
+    X, x=forward(x_t[:,0:4], wc, t)
+    for i in range(3):
+        plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
+        plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
+        plt.show()
+    X, x=forward(x_t, wc, t)
+    
+    
+    error.append(err(x_t, wc, t)[0])
+    amin=100
+    for i in range(t):
+        a=np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]
+        #print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
+        if i==0:amax=a.shape[0]*np.mean(a)
+        if a.shape[0]*np.mean(a)<amin:amin=a.shape[0]*np.mean(a)
+    sparsity.append(amin/amax)
+            
+
+fig , ax1= plt.subplots()
+j=0
+for i in ploterr:
+    plt.loglog(i, label="depth"+str(tt[j]))
+    j+=1
+plt.legend()
+ax1.set_ylabel('Mean Squared Error')
+ax1.set_xlabel('Iterration')
+#plt.savefig("AutoTrainingCurveWideVariate.pdf")
+plt.show()
+
+fig = plt.figure()
+ax1 = fig.add_subplot(111)
+ax1.set_ylabel('Mean Squared Error')
+ax1.set_xlabel("Network's Depth")
+plt.plot(tt, error)
+ax1.set_ylim([0,0.5])
+#plt.savefig("AutoErrorVsDepthVariate.pdf")
+plt.show()

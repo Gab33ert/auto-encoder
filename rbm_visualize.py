@@ -65,7 +65,7 @@ def gibbs_sampling(visible, b, c, w, n, scaler, mode):
         for i in range(n):
             hidden=rbmt.sample_rbm_forward(a, c, w)
             visible=rbmt.sample_grbm_backward(hidden, b, w)
-        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible)).reshape(ims,ims), vmin=-100, vmax= 400)
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
         plt.show()
     else:

@@ -14,10 +14,13 @@ import copy
 from sklearn import preprocessing
 import time
 
+from scipy import sparse
+data_size=1000
 def connect(Pl, l, n_input_cells, n_output_cells):
-    sigma=200
+    sigma=340
     d=200
     W=[]
+    """
     q=1.4 #control the rate connection to first layer (has to be bigger than 1)
     win=np.floor(np.random.uniform(0,q,(len(Pl[0]),n_input_cells)))#create input connection
     for i in range(n_input_cells):#ensure each entry is connected to at least one neurone
@@ -28,6 +31,7 @@ def connect(Pl, l, n_input_cells, n_output_cells):
         if counter==0:
             win[randint(0,len(Pl[0])-1),i]=1
     W.append(win)
+    """
     for j in range(l-1):
         P1=Pl[j]
         P2=Pl[j+1]
@@ -49,14 +53,21 @@ def connect(Pl, l, n_input_cells, n_output_cells):
                     if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))):
                         w[j,i]=1
         W.append(w)
+    """
     wout=np.floor(np.random.uniform(0,3,(n_output_cells,len(Pl[l-1]))))
     W.append(wout)
-    
+    """
     return W
 
-def split(P, l):#l number of layer 
+def split(P, n_input_cells):#l number of layer 
     n=len(P)
     layer=[]
+    P=P[np.argsort(P[:,0]),:]
+    layer.append(P[0:n_input_cells,:][np.argsort(P[0:n_input_cells,:][:,1]),:])
+    P=P[n_input_cells:P.shape[0],:]
+    layer.append(P[0:P.shape[0]-n_input_cells,:])
+    layer.append(P[P.shape[0]-n_input_cells:P.shape[0],:][np.argsort(P[P.shape[0]-n_input_cells:P.shape[0],:][:,1]),:])
+    """
     for j in range(l):
         temp=[]
         c=1
@@ -70,6 +81,7 @@ def split(P, l):#l number of layer
                     c=0
         temp=np.array(temp)
         layer.append(temp)
+    """
     return np.array(layer)
 
 
@@ -99,7 +111,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
 	    density[:,i]=np.power(((3.85)*ii*(ii-1)+1)*np.ones((1,n)),0.75) #neurone density
     density_P  = density.cumsum(axis=1)
     density_Q  = density_P.cumsum(axis=1)
-    filename = "autoencoder-second-degree.npy"#aba.npy#autoencoder-second-degree.npy
+    filename = "autoencoder-second-degree-b.npy"#aba.npy#autoencoder-second-degree.npy
 
     if not os.path.exists(filename):
         cells_pos = np.zeros((n_cells,2))
@@ -110,7 +122,7 @@ def build(n_cells=1000, n_input_cells = 32, n_output_cells = 32,
         np.save(filename, cells_pos)
 
     cells_pos = np.load(filename)
-    cells_pos=split(cells_pos,l)
+    cells_pos=split(cells_pos,n_input_cells)
     #X,Y = cells_pos[:,0], cells_pos[:,1]
 
     
@@ -126,7 +138,8 @@ def sigmoid(x):
     return 1/(1+np.exp(-x))
 
 def dsigmoid(x):
-    return sigmoid(x)*(1-sigmoid(x))
+    x=sigmoid(x)
+    return x*(1-x)
 
 def forward(x, w):
     l=len(w)
@@ -134,7 +147,9 @@ def forward(x, w):
     for i in range(l):
         X.append(x)
         x=sigmoid(w[i].dot(x))
+        #x=np.asarray(sigmoid((sparse.csr_matrix(w[i]).dot(sparse.csr_matrix(x))).todense()))
     return X, x
+
 
 def backprop(x_in, x_in_t, w, alpha, Spatial): #propagate back, train W one step and resturn actual error
     X, x_out=forward(x_in,w)
@@ -150,15 +165,30 @@ def backprop(x_in, x_in_t, w, alpha, Spatial): #propagate back, train W one step
     else:
         for i in range(l+1):
             for j in range(x_in.shape[1]):
-               w[i]-=alpha*np.outer(e[l-i][:, j], X[i][:, j])
-    return w, (np.sum((x_out-x_in)**2))/(x_in.shape[1]), (np.sum((x_out_t-x_in_t)**2))/(x_in_t.shape[1])
+               w[i]-=alpha*(np.outer(e[l-i][:, j], X[i][:, j]))
+    return w, (np.sum((x_out-x_in)**2))/(x_in.shape[1]), np.mean(np.abs(x_out_t-x_in_t))
 
     
 def train(x_in, x_in_t, w, iterr, alpha, Spatial):
     error=np.zeros(iterr)
     error_t=np.zeros(iterr)
+    g=0
+    d=0
+    j=0
     for i in range(iterr):
-            w, error[i], error_t[i]= backprop(x_in, x_in_t, w, alpha, Spatial)
+        alpha*=(25)**(1/(-iterr))
+        x_batch=x_in[:,d:d+32]
+        g+=1
+        j+=1
+        if j==iterr//20: 
+            print(100*i/iterr, "%")
+            j=0
+        if g==32:
+            d+=32
+            g=0
+        if d>data_size-34:
+            d=0
+        w, error[i], error_t[i]= backprop(x_batch, x_in_t, w, alpha, Spatial)
     plt.loglog(error)
     plt.show()
     return w, error, error_t
@@ -183,28 +213,28 @@ def scheme_vis(layer, W):
         plt.scatter(i[:,0], i[:,1])
     plt.axis("off")
     plt.axis('equal')
-    plt.savefig("fig1.png")
+    #plt.savefig("fig1.pdf")
     plt.show()
     
-    fig, ax = plt.subplots()
-    for i in layer:
-        plt.scatter(i[:,0], i[:,1])
-    c=['r', 'g', 'b', 'y']
+    c=['b', 'g', 'b', 'y']
     conteur1=0
     conteur2=0
-    for i in range(1, len(W)-1):
+    fig, ax = plt.subplots()
+    for i in range(len(W)):
         conteur1+=np.sum(W[i])
         conteur2+=(W[i].shape[0])*(W[i].shape[1])
         lines=[]
         for n in range(W[i].shape[0]):
             for k in range(W[i].shape[1]):
                 if W[i][n,k]==1:
-                    lines.append([layer[i-1][k], layer[i][n]])
-        seg=LineCollection(lines, colors=c[i-1])
+                    lines.append([layer[i][k], layer[i+1][n]])
+        seg=LineCollection(lines, colors=c[i-1], zorder=0)
         ax.add_collection(seg)
+    for i in layer:
+        plt.scatter(i[:,0], i[:,1], zorder=1)
     plt.axis("off")
     ax.axis('equal')
-    plt.savefig("fig2.png")
+    #plt.savefig("fig2.pdf")
     plt.show()
     print(conteur1, conteur2)
     
@@ -215,32 +245,40 @@ def scheme_vis(layer, W):
 # ------
 #P, W, W_in, W_out, bias = build(1000, 32, 32, n_input=1, n_output=1,sparsity=0.05, seed=0)
  
-l=5 
-size=10
-alpha=0.03#0.03
+l=3
+size=28
+alpha=0.05#0.03
 iterr=10000
 
-P, W = build(50, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=2)
+P, W = build(85, size, size, l=l, n_input=1, n_output=1,sparsity=0.05, seed=2)
 w=copy.deepcopy(W)
 
 for i in range(len(w)):
     print(w[i].shape)
-    w[i]=w[i]*(2*np.random.random(w[i].shape)-1)
+    w[i]=w[i]*np.random.normal(0, 0.1, w[i].shape)
 
 #x=np.random.random([size])
 #data=np.random.random([size, 1])
 
 scaler = preprocessing.MinMaxScaler()
-data=generate_poly(size, 50, 4)
+data=generate_poly(size, data_size, 4)
 scaled_data=scaler.fit_transform(data)
 unscaled_data=scaler.inverse_transform(scaled_data)
-data_t=generate_poly(size, 50, 4)
+data_t=generate_poly(size, data_size, 4)
 scaled_data_t=scaler.transform(data_t)
 
-s1=time.time()
-a,b,e=train(scaled_data, scaled_data_t, w, iterr, alpha, True)
-s1=time.time()-s1
+
+a,b,e=train(scaled_data, scaled_data_t, w, 1000000, 0.1, True)#100000
 X, x=forward(scaled_data_t,w)
+
+for i in range(4):
+    fig , ax1= plt.subplots()
+    plt.plot(x[:,3+i:4+i], label="reconstructed polynomials") 
+    plt.plot(scaled_data[:,3+i:4+i],  label="test polynomials")
+    plt.legend(loc="upper right")
+    #plt.savefig("fig4.png")
+    plt.show()
+
 
 li=[]
 for i in range(len(X)):
@@ -251,27 +289,19 @@ a=np.mean(np.abs(x), axis=1)
 print(a.shape[0], np.mean(a))
 li.append(a.shape[0]*np.mean(a))
 
-fig , ax1= plt.subplots()
-plt.figure(figsize=(5,5))
-ax1.set_aspect(30)
-plt.plot(x[:,3:5], label="reconstructed polynomials") 
-plt.plot(scaled_data[:,3:5],  label="test polynomials")
-#plt.legend(loc="upper right")
-#plt.savefig("fig4.png")
-plt.show()
 
 for i in range(len(w)):
-    w[i]=(2*np.random.random(w[i].shape)-1)
+    w[i]=np.random.normal(0, 1, w[i].shape)
     
-s2=time.time()
-c,d,f=train(scaled_data, scaled_data_t, w, iterr, alpha, False)
-s2=time.time()-s2
+
+c,d,f=train(scaled_data, scaled_data_t, w, 1000000, 0.9, False)#maybe more iter
+
 
 
 fig = plt.figure()
 fig.subplots_adjust(top=0.8)
 ax1 = fig.add_subplot(211)
-ax1.set_ylabel('Mean Square Error')
+ax1.set_ylabel('Mean Absolute Value Error')
 ax1.set_xlabel('Iterration')
 
 plt.loglog(b, label="Spatial")
@@ -282,16 +312,34 @@ plt.show()
 
 fig = plt.figure()
 fig.subplots_adjust(top=0.8)
-ax1 = fig.add_subplot(211)
-ax1.set_ylabel('Mean Square Error')
+ax1 = fig.add_subplot(111)
+ax1.set_ylabel('Mean Absolute Value Error')
 ax1.set_xlabel('Iterration')
 
-plt.loglog(e, label="Spatial")
-plt.loglog(f, label="not Spatial")
+plt.plot(e, label="Spatial")
+plt.plot(f, label="All to all")
 plt.legend()
-#plt.savefig("fig3.png")
+ax1.set_xscale('log')
+#plt.savefig("fig3.pdf")
 plt.show()
 X, x=forward(scaled_data_t,w)
+
+fig = plt.figure()
+for i in range(4):
+    ax1 = fig.add_subplot(221+i)
+    if i==3 or i==2:ax1.set_xlabel('Input and output neurons')
+    #if i==0 or i==2:ax1.set_ylabel('Input and output neurons value')
+    if i==3:
+        plt.plot(x[:,2+i:3+i], label="Reconstructed polynomials") 
+        plt.plot(scaled_data[:,2+i:3+i], label="Test polynomials")
+        plt.legend(loc="lower right", fontsize="x-small")
+        
+    else:
+        plt.plot(x[:,3+i:4+i]) 
+        plt.plot(scaled_data[:,3+i:4+i])
+#plt.savefig("fig4.pdf")
+plt.show()
+
 
 lii=[]
 for i in range(len(X)):
@@ -307,16 +355,8 @@ plt.plot(lii, label="non spatial")
 plt.legend()
 plt.show()
 
-fig , ax1= plt.subplots()
-plt.figure(figsize=(5,5))
-ax1.set_aspect(30)
-plt.plot(x[:,3:5], label="reconstructed polynomials") 
-plt.plot(scaled_data[:,3:5],  label="test polynomials")
-#plt.legend(loc="upper right")
-#plt.savefig("fig4.png")
-plt.show()
 
-print(s2, s1)
+
 #for i in range(6):
 #    print(w[i]-W[i])
 #print(w)

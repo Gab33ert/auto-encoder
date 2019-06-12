@@ -65,7 +65,7 @@ height=7
 epsilon=[0]*4#rbm rate
 fe=[]
 ttt=[]
-Spatial=False
+Spatial=True
 
 
 P, W,in_index =top.build_3d(height, d, sigma)
@@ -117,6 +117,7 @@ x_train=np.asarray(x_train).reshape(dataset_size,-1)
 x_test=np.asarray(x_test).reshape(dataset_size_t,-1)
 scaler = preprocessing.StandardScaler().fit(x_train)
 x_train = np.transpose(scaler.transform(x_train))
+scaler1 = preprocessing.StandardScaler().fit(np.transpose(x_test))
 x_test=np.transpose(scaler.transform(x_test))
 
 
@@ -125,8 +126,8 @@ answer = input("Do you want to train y/n?")
 if answer == "y":
     if Spatial:
         epsilon=[0.01, 0.05, 0.01, 0.07] #RBMs learning rate
-        alpha=[1, 0.1, 0.01, 0.05]      #Sparsity learning rate ponderation
-        mode=[[0, 0], [1, 0], [1, 0], [1, 0.1]] #mode[i][0] 0 for grbm 1 for rbm   mode[i][1] 0 if no sparsity if !=0 mode[i][1]=target sparsity
+        alpha=[0.01, 0.01, 0.1, 0.05]      #Sparsity learning rate ponderation
+        mode=[[0, 0.1], [1, 0.1], [1, 0.1], [1, 0.1]] #mode[i][0] 0 for grbm 1 for rbm   mode[i][1] 0 if no sparsity if !=0 mode[i][1]=target sparsity
         iterr_rbm=[3000, 1000, 3000, 1000]
             
         b[0]=np.random.randn(Wt[0].shape[1],1)
@@ -212,7 +213,7 @@ if answer == "y":
         fe.append(rbmt.train_spatial_rbm(x_train_2, b[2],c[2],w[2], iterr_rbm[2], mode[2], epsilon[2], alpha[2], x_test_2, dataset_size, 1, 50, Wt[2]))
         ttt.append(time.time()-seconds)
         print("layer 3")
-        print("error", rbmv.error(x_test_2,b[2],b[3],w[2]))
+        print("error", rbmv.error(x_test_2,b[2],c[2],w[2]))
         print("time",time.time()-seconds)
         rbmv.gibbs_deep_sampling(x_test[:,1:2], b, c, w, 2, scaler)
     
@@ -449,7 +450,7 @@ if answer == "y":
     answer = input("Do you want to save it y/n?")
     if answer == "y":
         memory = store(height, d, sigma, W, Wt, P, index_list, Spatial, epsilon, alpha, mode, iterr_rbm, w, b, c, fe, ttt)
-        with open('no_restriction_sparse_dbn_non_spatial.pkl', 'wb') as output:
+        with open('no_restriction_sparse_spatial_dbn.pkl', 'wb') as output:
             pickle.dump(memory, output, pickle.HIGHEST_PROTOCOL)
     elif answer == "n":
         print("ok")
@@ -466,9 +467,6 @@ else:
 strl=['no_restriction_sparse_dbn_non_spatial.pkl', 'no_restriction_spatial_dbn.pkl']#['sparse_dbn_non_spatial.pkl', 'no_restriction_sparse_dbn_non_spatial.pkl', 'no_restriction_sparse_spatial_dbn.pkl', 'no_restriction_spatial_dbn.pkl']
 answer = input("Do you want to load y/n?")
 if answer == "y":#load already trained network parameter and plot reconstruction.
-    for i in range(6):
-        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(x_test[:,1+i:2+i]))).reshape(28,28), vmin=-100, vmax= 400)
-        plt.show()
     fig = plt.figure()
     for i in range(10):
             if i<5:fig.add_subplot(6,5,1+i)
@@ -483,9 +481,10 @@ if answer == "y":#load already trained network parameter and plot reconstruction
             w=memory.w 
             b=memory.b 
             c=memory.c 
-            
+            print("epsilon", memory.epsilon)
             print("alpha", memory.alpha)
             print("mode", memory.mode)
+        
         for i in range(10):
             n=2
             h=rbmt.sample_rbm_forward(x_test[:,i:i+1], c[0], w[0])
@@ -498,6 +497,29 @@ if answer == "y":#load already trained network parameter and plot reconstruction
             else:fig.add_subplot(6,5,16+i+k)
             plt.axis('off')
             plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(h))).reshape(ims,ims), vmin=-100, vmax= 400)
+        """   
+        for i in range(10):
+            n=2
+            h=rbmt.sample_rbm_forward(x_test[:,i:i+1], c[0], w[0])
+            for j in range(n):
+                h=rbmt.sample_rbm_forward(h, c[j+1], w[j+1])
+            for j in range(n):
+                h=rbmt.sample_rbm_backward(h, b[n-j], w[n-j])
+            h=rbmt.sample_grbm_backward(h, b[0], w[0])
+            if i<5:fig.add_subplot(6,5,6+i+k)
+            else:fig.add_subplot(6,5,16+i+k)
+            plt.axis('off')
+            if k==0:
+                n=2
+                h=rbmt.sample_rbm_forward(x_test, c[0], w[0])
+                for j in range(n):
+                    h=rbmt.sample_rbm_forward(h, c[j+1], w[j+1])
+                for j in range(n):
+                    h=rbmt.sample_rbm_backward(h, b[n-j], w[n-j])
+                h=rbmt.sample_grbm_backward(h, b[0], w[0])
+                plt.imshow(scaler1.inverse_transform(h)[:,i:i+1].reshape(ims,ims), vmin=-100, vmax= 400)
+            else:plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(h))).reshape(ims,ims), vmin=-100, vmax= 400)
+        """
         k+=5
                 
         
