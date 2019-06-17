@@ -1,4 +1,5 @@
-# topographique auto encoder sturcture
+# This algorithm train spatial auto encoder on random polynomials
+# You can uncomment one of the 4 different code section below the function definition and launch the program.
 import os
 import tqdm
 import voronoi
@@ -76,17 +77,6 @@ def build(d, n_cells, n_input_cells = 32, n_output_cells = 32, wide=0.05, sparsi
 
     return cells_pos/1000, W, in_index, out_index#cells_out[:,0]#, W_in, W_out, bias
     
-def unspatial(W, in_index):#completly rewire each layer
-    index=in_index
-    for i in range(t-1):
-        x=np.zeros(W.shape[0])
-        for j in index:x[j]=1
-        x=W.dot(x)
-        x=(x > 0).astype(int)
-        index_new=np.asarray([idx for idx, v in enumerate(x) if v])
-        W[index_new[:, None], index]=np.ones( W[index_new[:, None], index].shape)
-        index=index_new
-    return(W)
 
 
 def sigmoid(x):
@@ -153,15 +143,6 @@ def train(x_in, x_in_t, w, t, in_index, out_index, iterr, alpha):
         alpha*=(5)**(1/(-iterr))
         w,  a = backward(x_in, w, t, in_index, out_index, alpha)
         if i%10==0:error[i//10]=err(x_in_t, w, t)[0]
-        """
-        if a==100:
-            X, x=forward(x_in, w, t)
-            plt.plot(np.linspace(-1, 1, size),scaled_data)
-            plt.plot(np.linspace(-1, 1, size),x[out_index])
-            plt.show()
-            a=0
-        a+=1
-        """
     plt.plot(error)
     plt.show()
     return w, error
@@ -264,8 +245,8 @@ def generate_poly(data_size, n, degree):
         a=2*np.random.random([degree+1])-1
         data[:,i]=poly(np.linspace(-1, 1, data_size), a)
     return data
-"""
 
+#train for different wide parameter and plot sprsity profile
 size=30
 n_cell=300
 dataset_size=500
@@ -278,8 +259,7 @@ error=[]
 sparsity=[]
 connection_use=[]
 iterr=1000
-wide=[0.06, 0.06, 0.06, 0.06]#[0.1, 0.085, 0.07, 0.04, 0.001]
-#wide=0.05
+wide=[0.1, 0.085, 0.07, 0.04, 0.001]
 d=100#d=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
 data=generate_poly(size, dataset_size, 4)
@@ -300,8 +280,9 @@ for w in wide:
     
                 
             
-               
+      
     wc,e=train(x, x_t, wc, t, in_index, out_index, iterr, alpha)#iter 1000
+    
     fig = plt.figure()    
     ax1 = fig.add_subplot(111)
     plt.plot(e)
@@ -333,16 +314,23 @@ fig = plt.figure()
 ax1 = fig.add_subplot(111)
 j=0
 for i in ll:
-    plt.plot(i)#, label="wide "+str(wide[j]))
+    plt.plot(i, label="wide "+str(wide[j]))
     ax1.set_ylabel('Mean number of activated neurons in each layers')
     ax1.set_xlabel('Layers')
     ax1.set_ylim([0,20])
     j+=1
-#plt.legend(loc="upper left")
+plt.legend(loc="upper left")
 #plt.savefig("AutoSparsity.pdf")
 plt.show()
+
+
+
+
+
+
+
 """
-"""
+#train for different wide parameter multiple times and average the resulting error and sparsity, the process some plot
 #global variable
 size=30
 n_cell=300
@@ -374,7 +362,6 @@ for w in wide:
     s=0
     for j in range(5):
         P, W, in_index, out_index = build(d, n_cell, size, size,  w, sparsity=0.05, seed=1)
-        #unspatial(W, in_index)
         x=np.zeros((n_cell,dataset_size))
         x[in_index]=scaled_data
         x_t=np.zeros((n_cell,dataset_size_t))
@@ -450,7 +437,13 @@ ax1.set_ylim([0,0.5])
 #plt.savefig("AutoSparsityVsErrorWideVariate.pdf")
 plt.show()
 """
+
+
+
+
+
 """
+Train for varying d
 #global variable
 size=30
 n_cell=300
@@ -480,7 +473,6 @@ for d in dd:
     cu=0
     for j in range(1):
         P, W, in_index, out_index = build(d, n_cell, size, size,  wide, sparsity=0.05, seed=1)
-        #unspatial(W, in_index)
         x=np.zeros((n_cell,dataset_size))
         x[in_index]=scaled_data
         x_t=np.zeros((n_cell,dataset_size_t))
@@ -560,6 +552,13 @@ plt.plot(dd, connection_use)
 plt.show()
 
 """
+
+
+
+
+
+"""
+train for varying t
 #global variable
 size=30
 n_cell=300
@@ -588,7 +587,6 @@ ploterr=[]
 for t in tt:
     print(t)
     P, W, in_index, out_index = build(d, n_cell, size, size,  wide, sparsity=0.05, seed=1)
-    #unspatial(W, in_index)
     x=np.zeros((n_cell,dataset_size))
     x[in_index]=scaled_data
     x_t=np.zeros((n_cell,dataset_size_t))
@@ -641,3 +639,4 @@ plt.plot(tt, error)
 ax1.set_ylim([0,0.5])
 #plt.savefig("AutoErrorVsDepthVariate.pdf")
 plt.show()
+"""

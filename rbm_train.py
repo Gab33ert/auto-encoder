@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Apr 29 10:56:41 2019
-
-@author: gouraud
-"""
+#function for training the DBN
 import matplotlib.pyplot as plt
 import numpy as np
 import time
@@ -24,7 +20,7 @@ def sample_rbm_backward(hidden, c, w):
 def sample_grbm_backward(hidden, b, w):
     return np.random.normal(np.tile(b,(1,hidden.shape[1]))+np.transpose(w).dot(hidden), 0.01)#np.where(np.random.rand(w.shape[1],hidden.shape[1]) < sigmoid(np.tile(b,(1,hidden.shape[1]))+np.transpose(w).dot(hidden)), 0, 1) #this is no more sampling!!!!!!!!!!!!!
 
-def backandforw(hidden, b, c, w, k, mode):
+def backandforw(hidden, b, c, w, k, mode):#propagate backward and forward between 2 layers k times
     for i in range(k):
         if mode==0:
             visible_k=sample_grbm_backward(hidden, b, w)
@@ -33,7 +29,7 @@ def backandforw(hidden, b, c, w, k, mode):
         hidden=sample_rbm_forward(visible_k, c, w)
     return hidden, visible_k
 
-def spatial_actualise_weight(visible, b, c, w, k, epsilon, alpha, mode, Wt):
+def spatial_actualise_weight(visible, b, c, w, k, epsilon, alpha, mode, Wt):#proceed to contrastive divergence and update weigts
     hidden=sample_rbm_forward(visible, c, w)
     hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))*Wt
@@ -47,7 +43,7 @@ def spatial_actualise_weight(visible, b, c, w, k, epsilon, alpha, mode, Wt):
         w+=epsilon*alpha*q*(1/visible.shape[1])*(dsigm.dot(np.transpose(visible)))*Wt
         c+=epsilon*alpha*q*(1/visible.shape[1])*(np.sum(dsigm, axis=1).reshape(w.shape[0],1))
 
-def actualise_weight(visible, b, c, w, k, epsilon, alpha, mode):
+def actualise_weight(visible, b, c, w, k, epsilon, alpha, mode):#proceed to contrastive divergence and update weigts
     hidden=sample_rbm_forward(visible, c, w)
     hidden_c, visible_c=backandforw(hidden, b, c, w, k, mode[0])
     w+=(1/(visible.shape[1]))*epsilon*(hidden.dot(np.transpose(visible))-hidden_c.dot(np.transpose(visible_c)))
@@ -102,6 +98,8 @@ def train_rbm(visible, b, c, w, iterr_rbm, mode, epsilon, alpha, x_test, dataset
                 #fE.append(rbmv.pseudo_likelihood_rbm(visible, b, c, w, 3))
                 t2+=time.time()-tt   
     plt.hist(np.mean(func.sigmoid(c+w.dot(visible)), axis=1), bins=30)
+    plt.title("mean neurons activation")
+    plt.legend()
     plt.show() 
     plt.plot(ind, e,label="test set")
     plt.plot(ind, E, label="training set")

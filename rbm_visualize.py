@@ -1,16 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Mon Apr 29 11:03:45 2019
-
-@author: gouraud
-"""
+#functions to monitor learning and reconstruction.
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.core.umath_tests import inner1d
 import copy
-import time
-
 import rbm_train as rbmt
 import function as func
 ims=28
@@ -56,7 +50,7 @@ def pseudo_likelihood_grbm(visible, b, c, w, n):
     return visible.shape[0]*l/n
 
 
-def gibbs_sampling(visible, b, c, w, n, scaler, mode):
+def gibbs_sampling(visible, b, c, w, n, scaler, mode): #shows examples and their reconstruction after going through the first layer and going back n times
     if mode[0]==0:
         plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
@@ -69,18 +63,18 @@ def gibbs_sampling(visible, b, c, w, n, scaler, mode):
         plt.colorbar()
         plt.show()
     else:
-        plt.imshow(visible.reshape(ims,ims))
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
         plt.show()
         a=visible
         for i in range(n):
             hidden=rbmt.sample_rbm_forward(a, c, w)
             visible=rbmt.sample_rbm_backward(hidden, b, w)
-        plt.imshow(visible.reshape(ims,ims))
+        plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
         plt.colorbar()
-        plt.show()        
+        plt.show()       
     
-def gibbs_deep_sampling(visible, b, c, w, n, scaler):
+def gibbs_deep_sampling(visible, b, c, w, n, scaler):#shows examples and their reconstruction after going through the n+1 first layers and going back
     #plt.imshow(np.transpose(scaler.inverse_transform(np.transpose(visible))).reshape(ims,ims), vmin=-100, vmax= 400)
     #plt.colorbar()
     #plt.show()
@@ -95,19 +89,6 @@ def gibbs_deep_sampling(visible, b, c, w, n, scaler):
     plt.colorbar()
     plt.show()
       
-def fake_data(b, c, w, n):
-    hidden=np.floor(1.1*np.random.random(size=c[n].shape))
-    hidden, visible=rbmt.backandforw(hidden, b[n], c[n], w[n], 50, 1)
-    N=n
-    while N >1:
-        visible=rbmt.sample_rbm_backward(visible, b[N-1], w[N-1])
-        N-=1
-    plt.imshow(rbmt.sample_grbm_backward(visible, b[N-1], w[N-1]).reshape(ims,ims))
-    
-
-#def error(visible, b,c,w):
-#    return np.sum(np.abs(visible-rbmt.sample_rbm_backward(rbmt.sample_rbm_forward(visible,c,w),b,w)))/(visible.shape[0]*visible.shape[1])
-
 def error(visible, b, c, w):
     a=visible
     return np.mean(np.abs(a-rbmt.sample_rbm_backward(rbmt.sample_rbm_forward(visible,c,w),b,w)))

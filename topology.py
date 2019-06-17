@@ -1,53 +1,8 @@
-# topographique auto encoder sturcture
-import os
-import tqdm
-import voronoi
+# Function for creating the DBN topology
 import numpy as np
 np.set_printoptions(threshold=np.inf)
 
 
-def build(n_cells, n_input_cells = 32, n_output_cells = 32, sparsity = 0.01, seed=0):
-    """
-
-    Parameters:
-    -----------
-
-    n_cells:        Number of cells in the reservoir
-    n_input_cells:  Number of cells receiving external input
-    n_output_cells: Number of cells sending external output
-    n_input:        Number of external input
-    n_output:       Number of external output
-    sparsity:       Connection rate
-    seed:           Seed for the random genrator
-
-    
-    """
-
-    #np.random.seed(seed)
-    density    = np.ones((1000,1000))
-    n=1000
-    for i in range(n):
-	    ii=i/(n-1)
-	    density[:,i]=np.power((ii*(ii-2)+1)*np.ones((1,n)),6) #neurone density
-    density_P  = density.cumsum(axis=1)
-    density_Q  = density_P.cumsum(axis=1)
-    filename = "autoencoder-rbm-MNIST.npy"#"CVT-%d-seed-%d.npy" % (n_cells,seed)
-    if not os.path.exists(filename):
-        cells_pos = np.zeros((n_cells,2))
-        cells_pos[:,0] = np.random.uniform(0, 1000, n_cells)
-        cells_pos[:,1] = np.random.uniform(0, 1000, n_cells)
-        for i in tqdm.trange(75):
-            _, cells_pos = voronoi.centroids(cells_pos, density, density_P, density_Q)
-        np.save(filename, cells_pos)
-
-    cells_pos = np.load(filename)
-    cells_in  = np.argpartition(cells_pos, +n_input_cells, 0)[:+n_input_cells]
-    cells_out = np.argpartition(cells_pos, -n_output_cells, 0)[-n_output_cells:]
-
-    W=connect(cells_pos, n_input_cells, n_output_cells, d, sigma)
-
-    return cells_pos/1000, W, cells_in[:,0], cells_out[:,0]
- 
 def build_3d(n, d, sigma):                                                     #n is the depth, d and sigma are connection caracteristics
     i=28#input image sze (MNIST is ims*ims)
     cells_pos=np.zeros((n*i*i,3))
@@ -71,47 +26,10 @@ def build_3d(n, d, sigma):                                                     #
     #cells_pos[0:783, 2]=(2500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
     #cells_pos[i*i-1 , 2]=cells_pos[i*i-2 , 2]
     return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(i*i)
-"""
-def build_3d(n, d, sigma):                                                     #n is the depth, d and sigma are connection caracteristics
-    i=28#input image sze (MNIST is ims*ims)
-    cells_pos=np.zeros((n*i*i,3))
-    h=[28, 19, 15, 8, 6, 4]
-    for z in range(n):
-        j=h[z]#j=(28-6*z)
-        for y in range(j):
-            for x in range(j):
-                #if np.random.random()<np.exp(-0.6*z):#((n-z)/n)**10:
-                cells_pos[x+i*(y+i*z),0]=(x-0.5*(j-1))*1000/(i-1)+500
-                cells_pos[x+i*(y+i*z),1]=(y-0.5*(j-1))*1000/(i-1)+500
-                cells_pos[x+i*(y+i*z),2]=z*1000/(i-1)
-    #cells_pos=np.concatenate((np.zeros((1,3)),cells_pos[np.argwhere(cells_pos[:,0]+cells_pos[:,1]+cells_pos[:,2]),:][:,0,:]))
-    cells_pos[:,2]+=(1000/(i-1))*np.random.random(cells_pos[:,2].shape)
-    #cells_pos[0:783, 2]=(500/(i-1))*np.ones(cells_pos[0:783, 2].shape)
-    return cells_pos/1000, connect_3d_sharp(cells_pos, d, sigma), np.arange(i*i)
-"""  
   
 
 
-def connect(P, n_input_cells, n_output_cells, d, sigma):                       #build graph
-    n = len(P)
-    dP = P.reshape(1,n,2) - P.reshape(n,1,2)
-    # Shifted Distances 
-    D = np.hypot(dP[...,0]+d, dP[...,1])
-    #W = np.zeros((n,n))
-    W=np.where((np.random.uniform(0,1,(n,n)) < np.exp(-(D**2)/(2*sigma**2))), 1, 0)
-    s=np.argwhere(W==1)
-    for i in range(s.shape[0]):
-        if(P[s[i,1],0]>P[s[i,0],0]):
-            W[s[i,0],s[i,1]]=0
-    """
-    for i in range(n):
-        for j in range(n):
-            if (np.random.uniform(0,1) < np.exp(-(D[j,i]**2)/(2*sigma**2))) & (P[i,0]<P[j,0]):
-                W[j,i]=1
-    """
-    return W
-
-def connect_3d(P, d, sigma):
+def connect_3d(P, d, sigma):#connect using exponential scheme takes positions P, and parameters d, sigma as entry. Returns the connection matrix W with 0 and 1 
     n = len(P)
     dP = P.reshape(1,n,3) - P.reshape(n,1,3)
     # Shifted Distances 
@@ -125,7 +43,8 @@ def connect_3d(P, d, sigma):
             W[s[i,0],s[i,1]]=0
     return W
 
-def connect_3d_sharp(P, d, sigma):
+def connect_3d_sharp(P, d, sigma):#connect using sharp ellipse scheme takes positions P, and parameters d, sigma as entry. Returns the connection matrix W with 0 and 1 
+    width=0.05                      #change width to change the shape of the ellipse
     n = len(P)
     dP = P.reshape(1,n,3) - P.reshape(n,1,3)
     D = np.hypot(dP[...,0], dP[...,1])
@@ -133,7 +52,7 @@ def connect_3d_sharp(P, d, sigma):
     D = np.minimum(np.hypot(dP[...,0], dP[...,1]+1000),D) 
     D = np.minimum(np.hypot(dP[...,0]+1000, dP[...,1]+1000),D)
     # Shifted Distances 
-    D = np.hypot(0.05*D, dP[...,2]+d)
+    D = np.hypot(width*D, dP[...,2]+d)
     #W = np.zeros((n,n))
     W=np.where((D-sigma)<0, 1 , 0)#np.where((np.random.uniform(0,1,(n,n)) < np.exp((-np.power(np.maximum(0,D-4*sigma),2))/(2*(sigma/2)**2))), 1, 0)
     s=np.argwhere(W==1)
@@ -144,7 +63,7 @@ def connect_3d_sharp(P, d, sigma):
 
 
 
-def abstract_layer(in_index, W, t):                                            #unfold the total connection matrix into layer by layer connection matrix
+def abstract_layer(in_index, W, t):                                            #unfold the total connection matrix into layer by layer connection matrix. returns the list of matrix.
     index=in_index
     Wt=[]
     for i in range(t-1):
@@ -159,7 +78,7 @@ def abstract_layer(in_index, W, t):                                            #
     return Wt
 
 def abstract_layer_local_backward_restriction(in_index, W, t, n_min):           #unfold the total connection matrix into layer by layer connection matrix
-    index=in_index                                                               #at each layers neurons are connected to at least n_min neurons
+    index=in_index                                                               #This make sure that at each layers neurons are connected to at least n_min neurons deleting the neurons not having enought backward connection. If n_min=1, it doesn't delete qny neurons.
     Wt=[]
     index_list=[]
     index_list.append(in_index)

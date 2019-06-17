@@ -1,13 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-Created on Fri Apr 26 09:02:18 2019
-
-@author: gouraud
-"""
-import os
-import tqdm
-import voronoi
+#Tools for visualizing and analyzing the topology. Mainly usefull when building the dbn but not really usefule anymore.
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
@@ -69,7 +62,7 @@ def visualize_abstract_3d(P, W, index_list, t):                                 
     plt.show()
 
     
-def analyze_topology_back(Wt, depth):                                           #Plot histogram of the number of neurons in layers number depth that has a given % of connection to the input rate.
+def analyze_topology_back(Wt, depth):                                           #Plot histogram of the number of neurons in layers number "depth" that has a given % of connection(path) to the input.
     n=Wt[depth-1].shape[0]
     l=[]
     for j in range(n):
