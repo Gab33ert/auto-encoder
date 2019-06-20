@@ -7,11 +7,12 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import copy
+import scipy.special as scpb
 from sklearn import preprocessing
 np.set_printoptions(threshold=np.inf)
 import time
 
-
+np.random.seed(0)
 def connect(P, n_input_cells, n_output_cells, d, sigma, wide):
     c=0
     b=0
@@ -80,11 +81,11 @@ def build(d, n_cells, n_input_cells = 32, n_output_cells = 32, wide=0.05, sparsi
 
 
 def sigmoid(x):
-    return 2/(1+np.exp(-x))-1
+    return 2/(1+np.exp(-4*x))-1
 
 def dsigmoid(x):
     f=sigmoid(x)
-    return -(f+1)*(f-1)/2
+    return -4*(f+1)*(f-1)/2
 
 def forward(x, w, t):
     X=[]
@@ -111,7 +112,7 @@ def backward(x_in, w, t, in_index, out_index, alpha):#for i in range(7):print(np
     mask[out_index] = False
     x_out_reshape=x_out
     x_out_reshape[mask]=0
-    sparse_rate=[0, 0, 0, 0, 0, 0, 0, 0]
+    sparse_rate=[0, 0, 0, 0, 0, 0, 0, 0]#put a non zero value if you want sparsity constraint in one of the layers
     e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
     for i in range(t-2,-1,-1):
         b=sparse_rate[i]*sigmoid(w.dot(X[i]))
@@ -263,14 +264,14 @@ n_cell=300
 dataset_size=500
 dataset_size_t=400
 t=7
-sigma=10#15
+sigma=15#15
 d=100
 alpha=0.001
 error=[]
 sparsity=[]
 connection_use=[]
 iterr=500
-wide=[0.04,0.01, 0.001, 0.0001]#[0.1, 0.085, 0.07, 0.04, 0.001]
+wide=[0.15, 0.125, 0.1, 0.05, 0.01]
 d=100#d=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
 data=generate_poly(size, dataset_size, 4)
@@ -280,6 +281,7 @@ scaled_data_t=scaler.fit_transform(data_t)
 lll=[]
 ll=[]
 for w in wide:
+    np.random.seed(0)
     P, W, in_index, out_index = build(d, n_cell, size, size,  w, sparsity=0.05, seed=1)
     x=np.zeros((n_cell,dataset_size))
     x[in_index]=scaled_data
@@ -312,7 +314,6 @@ for w in wide:
     ax1.set_xlabel('Training iterration (x10)')
     #plt.savefig("trainingCruveAuto.pdf")
     plt.show()
-    print("err ",err(x_t,wc,t))   
     X, x=forward(x_t, wc, t)
     fig = plt.figure()
     for i in range(2, 6):
@@ -329,10 +330,10 @@ for w in wide:
         print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
         l.append(a.shape[0]*np.mean(a))
     a=np.mean(np.abs(x), axis=1)[np.argwhere(np.mean(np.abs(x), axis=1)!=0)]
-    print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
+    print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))#, "{:.2e}".format((2**(a.shape[0]*np.mean(a)))*scpb.binom(a.shape[0],a.shape[0]*np.mean(a))))
     l.append(a.shape[0]*np.mean(a))
     ll.append(l)
-    
+    print("err ",err(x_t,wc,t))   
       
 fig = plt.figure()
 ax1 = fig.add_subplot(111)
@@ -341,7 +342,7 @@ for i in lll:
     plt.plot(i, label="wide "+str(wide[j]))
     ax1.set_ylabel('Mean number of activated neurons in each layers')
     ax1.set_xlabel('Layers')
-    ax1.set_ylim([0,20])
+    #ax1.set_ylim([0,20])
     j+=1
 plt.title("before training")
 plt.legend(loc="upper left")
@@ -356,7 +357,7 @@ for i in ll:
     plt.plot(i, label="wide "+str(wide[j]))
     ax1.set_ylabel('Mean number of activated neurons in each layers')
     ax1.set_xlabel('Layers')
-    ax1.set_ylim([0,20])
+    ax1.set_ylim([0,21])
     j+=1
 plt.title("after training")
 plt.legend(loc="upper left")

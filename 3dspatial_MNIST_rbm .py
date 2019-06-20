@@ -1,4 +1,4 @@
-# MNIST DBN. Can change Spatial from True to False if you want to train Spatial or all to all network. Can load already train example and save your own example if needed.
+g# MNIST DBN. Can change Spatial from True to False if you want to train Spatial or all to all network. Can load already train example and save your own example if needed.
 import numpy as np
 import matplotlib.pyplot as plt
 import copy
