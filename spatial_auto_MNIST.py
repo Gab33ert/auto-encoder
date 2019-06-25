@@ -22,7 +22,7 @@ sigma=10#100
 d=150
 wide=0.01
 alpha=0.0005
-iterr=2000
+iterr=100
 
 
 def connect(P, n_input_cells, n_output_cells, d, sigma):
@@ -110,13 +110,13 @@ def backward(x_in, w, t, in_index, out_index, alpha):
     mask[out_index] = False
     x_out_reshape=x_out
     x_out_reshape[mask]=0
-    sparse_rate=[1]
+    sparse_rate=[5]
     e=[dsigmoid(w.dot(X[t-1]))*(x_out_reshape-x_in_reshape)]
     for i in range(t-2,-1,-1):
         b=sparse_rate[i]*sigmoid(w.dot(X[i]))
         e.append(dsigmoid(w.dot(X[i]))*(np.transpose(w).dot(e[t-2-i])+b))
     for i in range(t):
-        w-=alpha*e[t-1-i].dot(np.transpose(X[i]))*W
+        w-=alpha*(e[t-1-i].dot(np.transpose(X[i])))*W
     return  w, (np.sum(np.abs((x_out_reshape-x_in_reshape))))/(in_index.shape[0]*x_in.shape[1])
 
 def err(x_in, w, t):
@@ -134,6 +134,7 @@ def err(x_in, w, t):
     
 def train(x_in, x_t, w, t, in_index, out_index, iterr, alpha):
     error=np.zeros(iterr)
+    #c=0
     for i in range(iterr):
         print(i)
         #x_batch=x_in[:,c:c+32]
@@ -168,6 +169,32 @@ def visualize(W, P, in_index, t):
     plt.show()
     return index
  
+def animation(n, t, X, x, P):
+    XX=[]
+    for i in range(t):
+        XX.append(X[i][:,n])
+    XX.append(x[:,n])
+    f=plt.figure()
+    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
+    l= plt.scatter(P[:,0],P[:,1], c=X[0][:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
+    
+    def update(i):
+        l.set_array(XX[i])
+        return l,
+    ami=FuncAnimation(f, update, frames=t+1, interval=400, blit=True, repeat=True)
+    ami.save("lala.gif", writer="imagemagick")
+    plt.show()
+    
+    for i in range(t):
+        plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
+        plt.scatter(P[:,0],P[:,1], c=X[i][:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
+        plt.colorbar()
+        plt.show()
+    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
+    plt.scatter(P[:,0],P[:,1], c=x[:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
+    plt.colorbar()
+    plt.show()    
+
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
     def poly(x, param):
@@ -201,10 +228,18 @@ x_test=np.transpose(np.asarray(x_test).reshape(400,-1))
 x_t[in_index]=x_test
 X, x=forward(x_t, wc, t)
 
+for i in range(2):                                                      #plot mean neuron activation, layer size and mean number of activated neuron(product of the 2 former) in each layer
+    a=(np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)])
+    print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
+a=(np.mean(np.abs(x), axis=1)[np.argwhere(np.mean(np.abs(x), axis=1)!=0)])
+print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))
+
+
   
 x=np.zeros((n_cell,dataset_size))
 x_train=np.transpose(np.asarray(x_train).reshape(dataset_size,-1))
 x[in_index]=x_train
+
 
 wc,e=train(x, x_t, wc, t, in_index, out_index, iterr, alpha)                #train the network
 
@@ -244,4 +279,3 @@ ax.set_xlabel('Iterration')
 ax.set_ylim(0, 0.65)
 #plt.savefig("autoMnistCurve.pdf")
 print(e[len(e)-10: len(e)-1])
-

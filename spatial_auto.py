@@ -246,6 +246,32 @@ def count_reccurence(dd):#how many times each connection is used
     plt.savefig("Totalnumberofconnections.pdf")
     plt.show()
 
+def animation(n, t, X, x, P):
+    XX=[]
+    for i in range(t):
+        XX.append(X[i][:,n])
+    XX.append(x[:,n])
+    f=plt.figure()
+    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
+    l= plt.scatter(P[:,0],P[:,1], c=X[0][:,n], cmap='PiYG', vmin=-1, vmax=1)
+    
+    def update(i):
+        l.set_array(XX[i])
+        return l,
+    ami=FuncAnimation(f, update, frames=t+1, interval=350, blit=True, repeat=True)
+    ami.save("lala.gif", writer="imagemagick")
+    plt.show()
+    
+    for i in range(t):
+        plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
+        plt.scatter(P[:,0],P[:,1], c=X[i][:,n], cmap='PiYG', vmin=-1, vmax=1)
+        plt.colorbar()
+        plt.show()
+    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
+    plt.scatter(P[:,0],P[:,1], c=x[:,n], cmap='PiYG', vmin=-1, vmax=1)
+    plt.colorbar()
+    plt.show()
+
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
     def poly(x, param):
