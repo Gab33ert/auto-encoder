@@ -15,7 +15,7 @@ import voronoi
 import tqdm
 from matplotlib.animation import FuncAnimation
 
-
+np.random.seed(0)
 
 def connect(P, n_input_cells, n_output_cells, d, sigma, wide):
     c=0
@@ -148,8 +148,6 @@ def train(x_in, x_in_t, w, t, in_index, out_index, iterr, alpha):
         alpha*=(5)**(1/(-iterr))
         w,  a = backward(x_in, w, t, in_index, out_index, alpha)
         if i%10==0:error[i//10]=err(x_in_t, w, t)[0]
-    plt.plot(error)
-    plt.show()
     return w, error
 
 def visualize(W, P, in_index, t):
@@ -197,9 +195,11 @@ def weightshist(w, W, im_index, t):#plot histogram of weight in each successive 
         x=(x > 0).astype(int)
         index_n=[idx for idx, v in enumerate(x) if v]
         Ws=w[index_n,:][:,index]
-        plt.hist(Ws[np.nonzero(Ws)])
-        plt.show()
+        plt.hist(Ws[np.nonzero(Ws)], label="weight hist layer "+str(i))
         index=index_n
+        plt.legend()
+        plt.show()
+    
 
 def animation(n, t, X, x, P):#plot propagation of the signal for the nth example of X, x and save a gif version
     XX=[]
@@ -216,16 +216,7 @@ def animation(n, t, X, x, P):#plot propagation of the signal for the nth example
     ami=FuncAnimation(f, update, frames=t+1, interval=400, blit=True, repeat=True)
     ami.save("lea.gif", writer="imagemagick")
     plt.show()
-    
-    for i in range(t):
-        plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
-        plt.scatter(P[:,0],P[:,1], c=X[i][:,n], cmap='PiYG', vmin=-1, vmax=1)
-        plt.colorbar()
-        plt.show()
-    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
-    plt.scatter(P[:,0],P[:,1], c=x[:,n], cmap='PiYG', vmin=-1, vmax=1)
-    plt.colorbar()
-    plt.show()
+
     
 def generate_poly(data_size, n, degree):#generate random polynomials
     data=np.zeros((data_size, n))
@@ -274,7 +265,7 @@ wc*=(2*np.random.random(wc.shape)-1)
 
 X, x1=forward(x_t, wc, t)          
 l=[]
-print("first collumn mean activation, then layer size, and finaly maen number of activated neurons(product of the 2 precedent collumns)")
+print("first collumn mean activation, then layer size, and finaly mean number of activated neurons(product of the 2 precedent collumns)")
 for i in range(t):
     a=np.mean(np.abs(X[i]), axis=1)[np.argwhere(np.mean(np.abs(X[i]), axis=1)!=0)]
     print(np.mean(a), a.shape[0], a.shape[0]*np.mean(a))

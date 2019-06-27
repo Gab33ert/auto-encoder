@@ -144,12 +144,11 @@ def train(x_in, x_in_t, w, t, in_index, out_index, iterr, alpha):
         alpha*=(5)**(1/(-iterr))
         w,  a = backward(x_in, w, t, in_index, out_index, alpha)
         if i%10==0:error[i//10]=err(x_in_t, w, t)[0]
-    plt.plot(error)
-    plt.show()
     return w, error
 
 def visualize(W, P, in_index, t):
     index=in_index
+    """
     fig = plt.figure()
     axes = fig.add_subplot(2,3,1)
     plt.scatter(P[:,0],P[:,1], s=1)
@@ -158,8 +157,9 @@ def visualize(W, P, in_index, t):
     plt.axis("off")
     plt.axis("equal")
     axes.set_xlim([0,1000])
-    
+    """
     l=[]
+    print("size of each layers")
     for i in range(t-1):
         x=np.zeros(W.shape[0])
         for j in index:x[j]=1
@@ -169,6 +169,7 @@ def visualize(W, P, in_index, t):
         index_n=[idx for idx, v in enumerate(x) if v]
         l.append([np.sum(W[index_n,:][:,index]),len(index)*len(index_n)])
         index=index_n
+        """
         if i<5:
             axes = fig.add_subplot(2,3,1+i+1)
             plt.scatter(P[:,0],P[:,1], s=1)
@@ -177,8 +178,10 @@ def visualize(W, P, in_index, t):
             plt.axis("off")
             plt.axis("equal")
             axes.set_xlim([0,1000])
+            """
+        
     #plt.savefig("neuralgasbis.pdf")    
-    plt.show()
+    #plt.show()
     index=np.array(index)[np.argsort(P[index][:,0])][len(index)-in_index.shape[0]:len(index)]
     index=index[np.argsort(P[index][:,1])]
     print("number of connection between 2 layers compared to all to all number of connection for similar layers.",l)
@@ -223,8 +226,6 @@ def count_reccurence(dd):#how many times each connection is used
             de=np.sum(np.where(w>1,1,0))
             to=un+de
             print(zer, un/to, de/to)
-            plt.hist(w, bins =3)
-            plt.show()
             s+=un/to
             ss+=to
         l.append(s/5)
@@ -270,7 +271,7 @@ def animation(n, t, X, x, P):
     plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=50)
     plt.scatter(P[:,0],P[:,1], c=x[:,n], cmap='PiYG', vmin=-1, vmax=1)
     plt.colorbar()
-    plt.show()
+
 
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
@@ -341,14 +342,16 @@ for w in wide:
     #plt.savefig("trainingCruveAuto.pdf")
     plt.show()
     X, x=forward(x_t, wc, t)
-    fig = plt.figure()
-    for i in range(2, 6):
-        ax1 = fig.add_subplot(221+i-2)
-        plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
-        plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
-        ax1.set_xlabel('input and output neurons')
+                                                    #plot polynomials and reconstructions
+    #fig = plt.figure()
+    #for i in range(2, 6):
+    #    ax1 = fig.add_subplot(221+i-2)
+    #    plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
+    #    plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
+    #    ax1.set_xlabel('input and output neurons')
     #plt.savefig("AutoPolinom.pdf")
-    plt.show()
+    #plt.show()
+    
     l=[]
     print("first collumn mean activation, then layer size, and finaly maen number of activated neurons(product of the 2 precedent collumns)")
     for i in range(t):
@@ -410,8 +413,8 @@ alpha=0.001
 error=[]
 sparsity=[]
 connection_use=[]
-iterr=1000
-wide=[0.05]#[0.15, 0.09, 0.08, 0.07, 0.06, 0.05, 0.02, 0.001]
+iterr=500
+wide=[0.15, 0.09, 0.08, 0.07, 0.06, 0.05, 0.02, 0.001]
 #wide=0.05
 d=100#d=[100]#, 50, 25, 12, 6, 3]
 scaler = preprocessing.MinMaxScaler(feature_range=(-1, 1))#be careful the polynome are in [0,1] maybe you need [-1,1]
@@ -444,11 +447,6 @@ for w in wide:
         plt.show()
         if j==0:ploterr.append(e)
         
-        X, x=forward(x_t[:,0:4], wc, t)
-        for i in range(3):
-            plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
-            plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
-            plt.show()
         X, x=forward(x_t, wc, t)
         
         
@@ -503,14 +501,12 @@ plt.plot(sparsity, error)
 ax1.set_ylim([0,0.5])
 #plt.savefig("AutoSparsityVsErrorWideVariate.pdf")
 plt.show()
-"""
-
-
 
 
 
 """
-Train for varying d
+"""
+#Train for varying d
 #global variable
 size=30
 n_cell=300
@@ -552,16 +548,11 @@ for d in dd:
         
         s=time.time()
         wc,e=train(x, x_t, wc, t, in_index, out_index, iterr, alpha)#iter 1000
-        plt.show()
+
         if j==0:
             Time.append(time.time()-s)
             ploterr.append(e)
         
-        X, x=forward(x_t[:,0:4], wc, t)
-        for i in range(3):
-            plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
-            plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
-            plt.show()
         X, x=forward(x_t, wc, t)
         
         
@@ -618,14 +609,14 @@ ax1.set_xlabel('d')
 plt.plot(dd, connection_use)
 plt.show()
 
+
+
+
+
 """
 
-
-
-
-
 """
-train for varying t
+#train for varying t
 #global variable
 size=30
 n_cell=300
@@ -652,7 +643,7 @@ ploterr=[]
 
 
 for t in tt:
-    print(t)
+    print("t=",t)
     P, W, in_index, out_index = build(d, n_cell, size, size,  wide, sparsity=0.05, seed=1)
     x=np.zeros((n_cell,dataset_size))
     x[in_index]=scaled_data
@@ -670,7 +661,7 @@ for t in tt:
     if j==0:ploterr.append(e)
         
     X, x=forward(x_t[:,0:4], wc, t)
-    for i in range(3):
+    for i in range(1):
         plt.plot(np.linspace(-1, 1, size),scaled_data_t[:,i])
         plt.plot(np.linspace(-1, 1, size),x[:,i][out_index])
         plt.show()

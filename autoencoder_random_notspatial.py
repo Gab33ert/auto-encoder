@@ -159,8 +159,6 @@ def train(x_in, x_in_t, w, b, iterr, alpha, Spatial):
         if d>data_size-34:
             d=0
         w, error[i], error_t[i]= backprop(x_batch, x_in_t, w, b, alpha, Spatial)
-    plt.loglog(error)
-    plt.show()
     return w, error, error_t
 
 
@@ -242,14 +240,6 @@ scaled_data_t=scaler.transform(data_t)
 
 a,bb,e=train(scaled_data, scaled_data_t, w, b,1000, 0.5, True)#train the spatialized network (if Spatial=True and sparse initial weights)
 X, x=forward(scaled_data_t,w,b)
-
-for i in range(4):
-    fig , ax1= plt.subplots()
-    plt.plot(x[:,3+i:4+i], label="reconstructed polynomials") 
-    plt.plot(scaled_data[:,3+i:4+i],  label="test polynomials")
-    plt.legend(loc="upper right")
-    #plt.savefig("fig4.png")
-    plt.show()
 
 
 fig = plt.figure()#polinoms and reconstructions

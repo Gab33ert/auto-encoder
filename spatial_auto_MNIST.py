@@ -169,31 +169,6 @@ def visualize(W, P, in_index, t):
     plt.show()
     return index
  
-def animation(n, t, X, x, P):
-    XX=[]
-    for i in range(t):
-        XX.append(X[i][:,n])
-    XX.append(x[:,n])
-    f=plt.figure()
-    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
-    l= plt.scatter(P[:,0],P[:,1], c=X[0][:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
-    
-    def update(i):
-        l.set_array(XX[i])
-        return l,
-    ami=FuncAnimation(f, update, frames=t+1, interval=400, blit=True, repeat=True)
-    ami.save("lala.gif", writer="imagemagick")
-    plt.show()
-    
-    for i in range(t):
-        plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
-        plt.scatter(P[:,0],P[:,1], c=X[i][:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
-        plt.colorbar()
-        plt.show()
-    plt.scatter(P[out_index][:,0],P[out_index][:,1], color="black", s=7)
-    plt.scatter(P[:,0],P[:,1], c=x[:,n], cmap='PiYG', vmin=-1, vmax=1, s=5)
-    plt.colorbar()
-    plt.show()    
 
 def generate_poly(data_size, n, degree):
     data=np.zeros((data_size, n))
